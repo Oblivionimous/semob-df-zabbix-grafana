@@ -153,11 +153,11 @@ git remote add origin URL_DO_REPOSITORIO
 git push -u origin main
 ```
 
-O repositório já está público. Antes de republicar, distribuir ou atribuir uma licença, confira três pontos.
+O repositório é público e o código está licenciado sob a [licença MIT](../LICENSE). Antes de distribuir ou publicar uma versão derivada, confira três pontos.
 
-1. O repositório não tem licença. Escolha uma e adicione o arquivo `LICENSE`.
-2. O arquivo `grafana/src/logo-gdf.png` é o logo do Governo do Distrito Federal. Confirme a autorização de uso.
-3. Nenhum arquivo do repositório contém credenciais. Os exemplos usam `COLE_O_TOKEN_AQUI` e `SEU_FRONTEND` como marcadores.
+1. Preserve o aviso de direitos autorais e o texto da licença MIT nas cópias ou partes substanciais do software.
+2. O arquivo `grafana/src/logo-gdf.png` é o logotipo do Governo do Distrito Federal. A licença MIT não concede direitos sobre essa marca institucional.
+3. Verifique se a versão a distribuir não contém credenciais. Os exemplos existentes usam `COLE_O_TOKEN_AQUI` e `SEU_FRONTEND` como marcadores.
 
 Para marcar uma versão, use uma etiqueta.
 
