@@ -15,6 +15,8 @@
 │       ├── panel.js
 │       ├── panel.css
 │       └── logo-gdf.png
+├── galeria/
+│   └── Screenshot_1.png ... Screenshot_14.png
 ├── docs/
 │   ├── instalacao.md
 │   ├── arquitetura.md
@@ -37,6 +39,25 @@
 ```
 
 O arquivo `docs/referencia-template.md` é gerado. Os arquivos `zabbix/*.yaml` e `grafana/dashboard_semob_df.json` são os artefatos importáveis, e os testes leem direto deles.
+
+## Processo de desenvolvimento e validação
+
+```mermaid
+flowchart TD
+    S["Alterar YAML, JS ou CSS"] --> D{"Qual artefato?"}
+    D -->|"Painel"| P["sync_panel.py build"]
+    D -->|"Template"| R["gerar_referencia.py"]
+    D -->|"Documentação"| MD["Conferir Markdown, links e Mermaid"]
+    P --> T["Executar testes"]
+    R --> T
+    MD --> T
+    T --> E{"Testes aprovados?"}
+    E -->|"Não"| S
+    E -->|"Sim"| H["Testar importação e renderização em homologação"]
+    H --> C["Revisar diff e abrir pull request"]
+```
+
+Os diagramas usam sintaxe Mermaid nativa do GitHub. Imagens e legendas são distribuídas pelos guias temáticos, com índice em [galeria.md](galeria.md).
 
 ## Editar o template
 
@@ -97,6 +118,10 @@ npm ci --prefix tests
 | `python tests/test_dashboard.py` | Um painel, data sources por entrada de importação, variáveis declaradas e filtros das consultas e do script batendo com os nomes dos itens do template |
 | `npm test --prefix tests` | O painel em jsdom com Leaflet real, com abas, cartões, busca, problemas, queda para a dispersão sem Leaflet e caixa de erro |
 
+![Figura 1. Dashboard Zabbix usado como referência visual.](../galeria/Screenshot_11.png)
+
+*Figura 1. Referência de operação no frontend Zabbix 7.0. A renderização não é reproduzida pelos testes automatizados.*
+
 ### Limites dos testes
 
 - O pacote `dukpy` usa o Duktape, o mesmo motor de JavaScript do Zabbix. A versão embutida pode diferir da do seu Zabbix.
@@ -114,11 +139,11 @@ Para repetir a validação, clone o ramo `release/7.0` do Zabbix e execute essas
 
 O workflow `.github/workflows/ci.yml` roda os mesmos comandos da tabela de testes a cada push e pull request, em `ubuntu-latest`, com Python 3.12 e Node 22.
 
-Ele foi escrito junto com o repositório e os comandos foram executados localmente. Na preparação do repositório, o workflow ainda não rodou no GitHub. Confira a primeira execução na aba Actions.
+Ele foi escrito junto com o repositório e os comandos foram executados localmente. A execução deve ser conferida na aba [Actions](https://github.com/Oblivionimous/semob-df-zabbix-grafana/actions). Em 10/10/2026, foram observadas duas execuções concluídas com sucesso, incluindo a revisão original da branch main. Isso não substitui os testes de importação e de renderização visual.
 
 ## Publicar no GitHub
 
-Os comandos criam o repositório local e enviam para um remoto vazio. Substitua `URL_DO_REPOSITORIO` pelo endereço do repositório.
+Os comandos abaixo exemplificam a inicialização de um **novo repositório local** e o envio para um remoto vazio. Não os execute dentro de um clone que já contém histórico ou remoto configurado. Substitua `URL_DO_REPOSITORIO` pelo endereço do repositório.
 
 ```bash
 git init -b main
@@ -128,7 +153,7 @@ git remote add origin URL_DO_REPOSITORIO
 git push -u origin main
 ```
 
-Antes de publicar, confira três pontos.
+O repositório já está público. Antes de republicar, distribuir ou atribuir uma licença, confira três pontos.
 
 1. O repositório não tem licença. Escolha uma e adicione o arquivo `LICENSE`.
 2. O arquivo `grafana/src/logo-gdf.png` é o logo do Governo do Distrito Federal. Confirme a autorização de uso.

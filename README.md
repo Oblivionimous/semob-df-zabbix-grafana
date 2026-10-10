@@ -15,21 +15,23 @@ O template coleta as posições GPS dos ônibus, o cadastro da frota, o catálog
 | `tools/` | Sincroniza o painel com o JSON e gera a referência do template |
 | `tests/` | Testes do template, dos scripts, do dashboard e do painel |
 
+Os guias completos estão em [Instalação](docs/instalacao.md), [Arquitetura](docs/arquitetura.md), [Dados da SEMOB](docs/dados-semob.md), [Operação](docs/operacao.md), [Desenvolvimento](docs/desenvolvimento.md) e [Referência do template](docs/referencia-template.md). A [galeria](docs/galeria.md) relaciona todas as capturas aos respectivos procedimentos.
+
 ## Como funciona
 
-```text
-GeoServer da SEMOB (WFS e WMS)
-   |                              |
-   | HTTP agent, 1 vez por minuto | Infinity, a cada atualização do dashboard
-   v                              |
-Zabbix server ou proxy            |
-   itens brutos                   |
-   -> resumo calculado em JavaScript
-   -> itens dependentes, descoberta de empresas e de camadas, triggers
-   |                              |
-   | API do Zabbix                |
-   v                              v
-Grafana, painel Business Text com mapa, empresas, linhas, qualidade, cadastros e problemas
+```mermaid
+flowchart LR
+    G["GeoServer SEMOB<br/>WFS e WMS"]
+    Z["Zabbix server ou proxy<br/>HTTP agent e cenário web"]
+    D["Pré-processamento<br/>itens dependentes, LLD e triggers"]
+    A["API do Zabbix"]
+    I["Infinity no Grafana<br/>parser Backend"]
+    P["Business Text<br/>painel com seis abas"]
+    M["Leaflet e OpenStreetMap<br/>no navegador"]
+    G -->|"Consultas periódicas"| Z
+    Z --> D --> A --> P
+    G -->|"Posições atuais"| I --> P
+    M --> P
 ```
 
 O Zabbix executa as consultas, sem agente no destino. As respostas completas, com cerca de 1 MB, ficam só em memória. O que vai para o banco são indicadores numéricos extraídos no pré-processamento.
@@ -64,6 +66,10 @@ O passo a passo completo, com comandos, está em [docs/instalacao.md](docs/insta
 6. Importe `grafana/dashboard_semob_df.json` e escolha os data sources Zabbix e Infinity.
 
 ## O que o dashboard mostra
+
+![Figura 1. Visão geral do painel da frota no Grafana, com mapa e indicadores.](galeria/Screenshot_1.png)
+
+*Figura 1. Painel Grafana com indicadores de veículos e mapa. Captura histórica, não indicador em tempo real.*
 
 Seis indicadores ficam fixos no topo e as abas trocam o conteúdo abaixo deles.
 
@@ -113,6 +119,8 @@ Os testes cobrem a estrutura do template, os scripts no motor Duktape do Zabbix,
 
 ## Limitações conhecidas
 
+As capturas da pasta `galeria/` registram estados observados do Zabbix e do Grafana. Números, horários e alertas exibidos nelas não são valores atuais do GeoServer.
+
 - A SEMOB não publica dicionário da API, limites de uso, SLA nem licença de reutilização.
 - O mapa mostra só a última posição de cada veículo. Trajetos exigem um coletor que grave o histórico.
 - O campo `datalocal` das posições não é usado, porque o fuso não é confirmado.
@@ -129,4 +137,4 @@ A lista completa e as hipóteses não confirmadas estão em [docs/dados-semob.md
 
 ## Licença
 
-O repositório ainda não define licença. Escolha uma antes de publicar. Os dados pertencem à SEMOB, e o catálogo consultado não traz termos de reutilização.
+O repositório está público, mas ainda não possui arquivo `LICENSE`. Isso não concede permissão automática de reutilização do código. Defina a licença do projeto e verifique separadamente os direitos de uso do logo do GDF e dos dados da SEMOB.
