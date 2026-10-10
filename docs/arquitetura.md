@@ -2,6 +2,35 @@
 
 Este documento explica como o template e o dashboard funcionam e por que foram desenhados assim. A lista completa de itens, triggers e macros está em [referencia-template.md](referencia-template.md).
 
+## Visão de componentes
+
+```mermaid
+flowchart TB
+    SEMOB["GeoServer SEMOB<br/>WFS 2.0 / WMS 1.3"]
+    ZHTTP["Zabbix<br/>Itens HTTP agent"]
+    ZSUM["JavaScript<br/>Resumos de posições, frota e camadas"]
+    ZDEP["Itens dependentes<br/>Indicadores numéricos"]
+    ZLLD["Descoberta LLD<br/>Operadoras e camadas"]
+    ZWEB["Cenário web<br/>Três verificações"]
+    ZAPI["API do Zabbix"]
+    INF["Infinity Backend<br/>GetFeature de posições"]
+    TXT["Business Text<br/>JavaScript e CSS"]
+    BROWSER["Navegador<br/>Leaflet e OpenStreetMap"]
+    SEMOB --> ZHTTP --> ZSUM
+    ZSUM --> ZDEP
+    ZSUM --> ZLLD
+    SEMOB --> ZWEB
+    ZDEP --> ZAPI
+    ZLLD --> ZAPI
+    ZWEB --> ZAPI
+    SEMOB --> INF
+    ZAPI --> TXT
+    INF --> TXT
+    TXT --> BROWSER
+```
+
+O Grafana **não recebe coordenadas pelo Zabbix**. O Zabbix persiste indicadores agregados, enquanto o Infinity consulta as posições atuais do GeoServer. A comunicação com o WFS pelo Grafana ocorre no backend, pois o GeoServer não anuncia CORS.
+
 ## Fonte de dados e forma de coleta
 
 O GeoServer da SEMOB publica os dados por WFS 2.0 e WMS 1.3.0, com leitura anônima. Não há agente nem credencial. Por isso o template usa HTTP agent e cenário web, executados pelo Zabbix server ou proxy. A única exigência de rede é HTTPS de saída e DNS.
@@ -98,6 +127,31 @@ O dashboard do Grafana tem um único painel Business Text. O JavaScript do paine
 
 O painel usa o modo de renderização `data`, que esconde o seletor de quadros do Business Text. O script lê os quadros por `context.panelData`.
 
+### Sequência de atualização
+
+```mermaid
+sequenceDiagram
+    participant Z as Zabbix
+    participant G as Grafana
+    participant S as GeoServer
+    participant N as Navegador
+    Z->>S: HTTP agent: GetFeature e GetCapabilities
+    S-->>Z: GeoJSON e XML
+    Z->>Z: Resumos, itens dependentes e triggers
+    N->>G: Abre ou atualiza dashboard
+    par Indicadores
+        G->>Z: Consultas B a G pela API
+        Z-->>G: Séries e problemas
+    and Posições
+        G->>S: Consulta A pelo Infinity Backend
+        S-->>G: Posições GeoJSON
+    end
+    G-->>N: Quadros do painel
+    N->>N: Business Text desenha abas e mapa Leaflet
+```
+
+As consultas do Grafana não são sincronizadas transacionalmente com a coleta do Zabbix. Portanto, totais de cadastro, posições e indicadores podem divergir no mesmo instante.
+
 ### Mapa
 
 O mapa usa Leaflet 1.9.4, carregado do cdnjs, com o mapa base do OpenStreetMap. O script esconde `window.define` durante o carregamento, porque o Grafana expõe um carregador AMD que impediria o Leaflet de criar `window.L`.
@@ -106,7 +160,25 @@ Cada veículo é um círculo na cor da empresa. Círculos maiores estão em movi
 
 Se o Leaflet não carregar em 8 segundos, o painel desenha a dispersão das coordenadas em um canvas e avisa na tela. Se só o mapa base do OpenStreetMap estiver bloqueado, o Leaflet funciona e os pontos aparecem sobre um fundo vazio.
 
-### Filtros
+![Figura 2. Vista complementar do painel de mapa da frota.](../galeria/Screenshot_2.png)
+
+*Figura 2. Captura complementar da visualização geográfica. A camada base e a posição dos veículos dependem da conectividade e da coleta no momento da consulta.*
+
+#### Abas de análise
+
+![Figura 3. Participação das empresas e perfil operacional.](../galeria/Screenshot_3.png)
+
+*Figura 3. Aba Empresas com participação percentual e comparação normalizada de indicadores.*
+
+![Figura 4. Quadro operacional por empresa.](../galeria/Screenshot_4.png)
+
+*Figura 4. Tabela por empresa, incluindo contagem, velocidade, linhas e idade do sinal.*
+
+![Figura 5. Análise das linhas de ônibus.](../galeria/Screenshot_5.png)
+
+*Figura 5. Aba Linhas com ranking, dispersão de velocidade e tabela de linhas com veículos recentes.*
+
+## Filtros
 
 Os filtros de empresa e de linha rodam no servidor Grafana, na expressão `filterExpression` da consulta A.
 
