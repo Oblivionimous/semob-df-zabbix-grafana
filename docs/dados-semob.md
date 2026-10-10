@@ -167,6 +167,12 @@ Seis códigos aparecem nas posições, mas não na camada Horários das Linhas. 
 
 A Sociedade de Transporte Coletivo de Brasília não aparece nas camadas de frota, de horários nem de posições.
 
+## Acesso público e reutilização
+
+O GeoServer disponibiliza camadas para consulta pública, sem autenticação nas operações de leitura examinadas. Essa disponibilidade permite integrar as respostas à solução de monitoramento.
+
+O [arquivo LICENSE](../LICENSE) licencia o código-fonte e a documentação autoral do projeto, **não os dados produzidos pela SEMOB/DF**. O catálogo consultado informa `Fees=NONE` e `AccessConstraints=NONE`, mas não apresenta uma licença específica de reutilização. Por isso, não se deve atribuir automaticamente a licença MIT aos dados, às marcas ou a outros materiais de terceiros. Confirme eventuais condições junto à fonte oficial quando necessário.
+
 ## O que não se sabe
 
 - A SEMOB não publica SLA, limite de requisições, política de retenção nem licença de reutilização. `Fees` e `AccessConstraints` valem `NONE` no catálogo, o que não substitui uma licença.
