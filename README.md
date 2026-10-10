@@ -1,6 +1,6 @@
 # SEMOB DF, frota de ônibus no Zabbix e no Grafana
 
-Template Zabbix 7.0 e dashboard Grafana para os dados públicos do GeoServer da SEMOB, a Secretaria de Transporte e Mobilidade do Distrito Federal.
+Template Zabbix 7.0 e dashboard Grafana para os dados públicos do GeoServer da SEMOB, a Secretaria de Transporte e Mobilidade do Distrito Federal. O código-fonte é aberto e pode ser usado, estudado, modificado e redistribuído sob a licença MIT.
 
 O template coleta as posições GPS dos ônibus, o cadastro da frota, o catálogo de camadas e a disponibilidade do serviço. O dashboard mostra o mapa da frota e as estatísticas em um painel com seis abas, em tema claro.
 
@@ -121,7 +121,7 @@ Os testes cobrem a estrutura do template, os scripts no motor Duktape do Zabbix,
 
 As capturas da pasta `galeria/` registram estados observados do Zabbix e do Grafana. Números, horários e alertas exibidos nelas não são valores atuais do GeoServer.
 
-- A SEMOB não publica dicionário da API, limites de uso, SLA nem licença de reutilização.
+- A SEMOB disponibiliza os dados por acesso público, mas o catálogo consultado não apresenta dicionário da API, limites de uso, SLA ou licença específica de reutilização dos dados. A licença MIT deste repositório não altera as condições da fonte.
 - O mapa mostra só a última posição de cada veículo. Trajetos exigem um coletor que grave o histórico.
 - O campo `datalocal` das posições não é usado, porque o fuso não é confirmado.
 - Os dados de passageiros ficam fora da descoberta de camadas, porque consultas sem filtro passaram de 20 segundos.
@@ -133,8 +133,12 @@ A lista completa e as hipóteses não confirmadas estão em [docs/dados-semob.md
 - GeoServer da SEMOB em `https://geoserver.semob.df.gov.br/geoserver/ows`.
 - Portarias SEMOB nº 63/2019 e nº 89/2019, que definem o formato dos dados de GPS.
 - Mapa base do OpenStreetMap, desenhado com Leaflet 1.9.4.
-- O arquivo `grafana/src/logo-gdf.png` é o logo do Governo do Distrito Federal. Confirme a autorização de uso antes de publicar o repositório.
+- O arquivo `grafana/src/logo-gdf.png` reproduz o logotipo do Governo do Distrito Federal. Seu uso deve observar os direitos sobre a marca institucional, independentemente da licença MIT do código.
 
-## Licença
+## Licença e reutilização
 
-O repositório está público, mas ainda não possui arquivo `LICENSE`. Isso não concede permissão automática de reutilização do código. Defina a licença do projeto e verifique separadamente os direitos de uso do logo do GDF e dos dados da SEMOB.
+O código-fonte e a documentação autoral deste projeto são disponibilizados sob a [licença MIT](LICENSE). Qualquer pessoa pode utilizar, copiar, modificar e redistribuir a solução, inclusive para fins comerciais, desde que preserve o aviso de direitos autorais e o texto da licença nas cópias ou partes substanciais.
+
+O projeto utiliza dados disponibilizados publicamente pela SEMOB/DF. Esses dados são de fonte externa e **não são licenciados pelo autor deste repositório**. Consulte as condições de uso da fonte original em [Dados da SEMOB](docs/dados-semob.md).
+
+A licença MIT **não concede direitos sobre o logotipo ou as marcas do Governo do Distrito Federal**. Verifique as condições de utilização desses elementos antes de redistribuir materiais que os incluam.
