@@ -16,6 +16,24 @@ Redefina as macros no host `SEMOB DF` para mudar intervalos e limiares sem edita
 
 A SEMOB não publica limite de requisições. Se o serviço começar a recusar consultas, aumente `{$SEMOB.POS.INTERVAL}`.
 
+## Fluxo de diagnóstico
+
+```mermaid
+flowchart TD
+    E["Dados ausentes ou incorretos"] --> O{"Origem do problema?"}
+    O -->|"Zabbix"| Z["Verificar Latest data e item mestre"]
+    O -->|"Grafana"| G["Abrir Query inspector: A a G"]
+    Z --> V{"HTTP e GeoJSON válidos?"}
+    V -->|"Não"| H["Testar DNS, TLS, proxy e GeoServer"]
+    V -->|"Sim"| P["Inspecionar resumo, LLD e itens dependentes"]
+    G --> I{"Consulta A retorna posições?"}
+    I -->|"Não"| W["Conferir Infinity, Allowed hosts e resposta WFS"]
+    I -->|"Sim"| F["Conferir B a G e painel Business Text"]
+    F --> M["Verificar Leaflet, tiles, console e filtros"]
+```
+
+Este fluxo é diagnóstico, não demonstra a causa de uma falha específica. Registre horário, host, status HTTP e mensagem de erro antes de alterar limiares.
+
 ## Problemas no Zabbix
 
 | Sintoma | Causa provável | O que fazer |
@@ -30,6 +48,14 @@ A SEMOB não publica limite de requisições. Se o serviço começar a recusar c
 | Descoberta de operadoras com erro | O item Script não alcançou o GeoServer ou a resposta mudou | Leia a mensagem de erro da regra. O Zabbix mantém os recursos já descobertos |
 | Muitos itens com nome `STPCR` ou `não identificado` | A SEMOB publicou códigos novos sem nome na camada Horários | Confira o filtro. O comportamento padrão é descartar esses grupos |
 | Alerta `catálogo WFS mudou de quantidade de camadas` | A SEMOB publicou ou removeu uma camada | Revise as camadas descobertas e feche o alerta manualmente |
+
+![Figura 1. Itens publicados por camada no Zabbix.](../galeria/Screenshot_9.png)
+
+*Figura 1. Dados recentes: contagem por camada e indicadores da frota. Conferir os horários da última checagem antes de comparar com o Grafana.*
+
+![Figura 2. Itens de posições e disponibilidade no Zabbix.](../galeria/Screenshot_10.png)
+
+*Figura 2. Itens dependentes das posições, resposta do cenário web e contagem de camadas.*
 
 ## Problemas no Grafana
 
@@ -46,6 +72,32 @@ A SEMOB não publica limite de requisições. Se o serviço começar a recusar c
 | Fonte do painel diferente do esperado | O navegador não alcançou o Google Fonts | O painel usa a fonte do sistema. Libere `fonts.googleapis.com` para usar a Inter |
 
 Para qualquer erro de script, abra o console do navegador com F12 e procure linhas com `[SEMOB]`.
+
+### Conferência visual do Grafana
+
+![Figura 3. Indicadores de qualidade e disponibilidade.](../galeria/Screenshot_6.png)
+
+*Figura 3. Distribuição de velocidades, idade do sinal, rumo, tempos de resposta e consistência. A tela é uma captura histórica.*
+
+![Figura 4. Cadastro e catálogo de camadas no Grafana.](../galeria/Screenshot_7.png)
+
+*Figura 4. Cadastro, comparação entre registrados e veículos com sinal e contadores das camadas.*
+
+Na Figura 4, o cartão **Camadas publicadas** aparece como `–`, embora a Figura 2 mostre **14** no Zabbix. A causa não foi confirmada. Confira a consulta D no Query inspector e a série `WFS: camadas publicadas`. Os dados das duas capturas podem ter sido obtidos em momentos distintos.
+
+### Diagnóstico do dashboard Zabbix
+
+![Figura 5. Gráficos de operação do dashboard Zabbix.](../galeria/Screenshot_12.png)
+
+*Figura 5. Evolução de veículos por estado, por operadora e tempo de resposta do GeoServer.*
+
+![Figura 6. Indicadores de qualidade e cadastro no Zabbix.](../galeria/Screenshot_13.png)
+
+*Figura 6. Página Qualidade e cadastros, com métricas de posicionamento e inventário.*
+
+![Figura 7. Visão complementar da qualidade e cadastro.](../galeria/Screenshot_14.png)
+
+*Figura 7. Detalhe dos gráficos de cadastro por operadora e registros por camada WFS.*
 
 ## Carga e limites
 
