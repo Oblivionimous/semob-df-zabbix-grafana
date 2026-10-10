@@ -8,6 +8,20 @@ Este guia leva do repositório vazio ao dashboard funcionando. Cada bloco de com
 | Servidor Grafana | Máquina onde o Grafana roda |
 | Estação | Computador de quem usa os frontends do Zabbix e do Grafana |
 
+## Fluxo de instalação
+
+```mermaid
+flowchart LR
+    A["Verificar HTTPS e DNS"] --> B["Importar template Zabbix"]
+    B --> C["Criar host e executar coletas"]
+    C --> D["Instalar plugins Grafana"]
+    D --> E["Configurar Zabbix e Infinity"]
+    E --> F["Importar dashboard"]
+    F --> G["Validar consultas, mapa e alertas"]
+```
+
+Os passos de instalação do Zabbix e do Grafana são independentes até a validação do dashboard. Não execute os comandos de provisionamento no host errado.
+
 ## 1. Testar o acesso ao GeoServer
 
 Execute no servidor Zabbix e repita no servidor Grafana. Os dois precisam alcançar o GeoServer.
@@ -80,6 +94,10 @@ O Zabbix agenda a primeira coleta de cada item em um ponto qualquer do intervalo
 
 As regras de frota e de camadas são dependentes e rodam junto com os itens do passo 2.
 
+![Figura 1. Dados recentes do host SEMOB DF no Zabbix.](../galeria/Screenshot_8.png)
+
+*Figura 1. Exemplo de filtro pelo host SEMOB DF em Monitoring > Latest data. Os valores da captura servem apenas para localizar os itens.*
+
 ## 5. Preparar o Grafana
 
 Execute no servidor Grafana. Os três plugins são necessários.
@@ -150,6 +168,18 @@ O dashboard tem quatro variáveis no topo.
 | Aba Qualidade e disponibilidade | Tempo de resposta das três etapas do cenário web |
 
 Se algo falhar, consulte [operacao.md](operacao.md).
+
+![Figura 2. Painel completo da frota no Grafana.](../galeria/Screenshot_1.png)
+
+*Figura 2. Exemplo da aba Mapa da frota, com seis indicadores no topo e filtros de host, operadora, linha e intervalo de sinal.*
+
+O dashboard incorporado ao template Zabbix pode ser conferido diretamente no host:
+
+![Figura 3. Dashboard de operação do Zabbix.](../galeria/Screenshot_11.png)
+
+*Figura 3. Página Operação do dashboard do template, com indicadores, gráficos e itens de operadoras descobertas.*
+
+**Atenção:** esta instalação não foi executada como parte desta revisão documental. As capturas são registros de uma execução anterior.
 
 ## Atualizar
 
