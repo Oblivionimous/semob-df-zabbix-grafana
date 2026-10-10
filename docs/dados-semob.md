@@ -10,6 +10,23 @@ Cada afirmação tem uma de três origens, e o texto diz qual.
 | Norma ou ato oficial | Texto de portaria, lei ou documento da SEMOB, com o endereço na lista de fontes |
 | Hipótese | Interpretação plausível, ainda não confirmada |
 
+## Fluxo de transformação dos dados
+
+```mermaid
+flowchart LR
+    P["semob:ultima_posicao"] --> R["Resumo das posições"]
+    R --> Q["Contagens e qualidade"]
+    P --> F["Mapa do Grafana"]
+    H["Horários das Linhas"] --> N["Tradução de id_operadora"]
+    N --> O["Descoberta de operadoras"]
+    R --> O
+    C["Frota por Operadora"] --> I["Cadastro e idade média"]
+    W["WFS GetCapabilities"] --> L["Descoberta de camadas"]
+    L --> T["Contagem resultType=hits"]
+```
+
+As métricas de posição e de cadastro têm fontes e ciclos de atualização distintos. Veículos com sinal recente não equivalem necessariamente a veículos cadastrados nem comprovam viagens realizadas.
+
 ## Serviços do GeoServer
 
 O endereço base é `https://geoserver.semob.df.gov.br/geoserver/ows`. A leitura é anônima. O projeto não executou operações de escrita.
@@ -50,6 +67,10 @@ Os registros contam linhas da camada, não entidades distintas. As camadas de ho
 
 Os nomes das camadas têm espaços e acentos. Codifique o nome em URLs.
 
+![Figura 1. Contadores por camada publicados no Zabbix.](../galeria/Screenshot_9.png)
+
+*Figura 1. Contagens de registros recuperadas por `resultType=hits`, com coleta histórica por camada. Contagens não identificam entidades únicas.*
+
 ## Camada de posições
 
 A camada `semob:ultima_posicao` guarda a última posição de cada veículo. Em 12,5 minutos de observação, 3.187 dos 3.619 registros mudaram o campo `dataregistro` e mantiveram o mesmo identificador. A camada é atualizada em tempo próximo do real.
@@ -85,6 +106,10 @@ Valores medidos pelo Zabbix em 09/10/2026.
 | Velocidades que não convertem para número | 0 |
 
 O template não verifica se a coordenada está dentro do Distrito Federal nem se acompanha a via.
+
+![Figura 2. Cadastro e circulação por operadora no Grafana.](../galeria/Screenshot_7.png)
+
+*Figura 2. Comparação entre veículos cadastrados e posições recentes. Valores acima de 100% indicam divergência de bases ou momentos de atualização, não comprovam por si só operação irregular.*
 
 ## Camada de frota
 
