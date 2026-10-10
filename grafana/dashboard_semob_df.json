@@ -1,0 +1,643 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_ZABBIX",
+      "label": "Zabbix",
+      "description": "Data source do plugin Zabbix",
+      "type": "datasource",
+      "pluginId": "alexanderzobnin-zabbix-datasource",
+      "pluginName": "Zabbix"
+    },
+    {
+      "name": "DS_INFINITY",
+      "label": "Infinity",
+      "description": "Data source do plugin Infinity (GeoServer SEMOB)",
+      "type": "datasource",
+      "pluginId": "yesoreyeram-infinity-datasource",
+      "pluginName": "Infinity"
+    }
+  ],
+  "__requires": [
+    {
+      "type": "grafana",
+      "id": "grafana",
+      "name": "Grafana",
+      "version": "11.0.0"
+    },
+    {
+      "type": "datasource",
+      "id": "alexanderzobnin-zabbix-datasource",
+      "name": "Zabbix",
+      "version": "4.0.0"
+    },
+    {
+      "type": "panel",
+      "id": "alexanderzobnin-zabbix-triggers-panel",
+      "name": "Zabbix Problems",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "stat",
+      "name": "Stat",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "timeseries",
+      "name": "Time series",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "bargauge",
+      "name": "Bar gauge",
+      "version": ""
+    },
+    {
+      "type": "datasource",
+      "id": "yesoreyeram-infinity-datasource",
+      "name": "Infinity",
+      "version": "2.0.0"
+    },
+    {
+      "type": "panel",
+      "id": "marcusolsson-dynamictext-panel",
+      "name": "Business Text",
+      "version": "5.6.0"
+    },
+    {
+      "type": "panel",
+      "id": "table",
+      "name": "Table",
+      "version": ""
+    }
+  ],
+  "uid": "semob-df-geoserver-novo",
+  "title": "SEMOB DF: transporte público (novo visual)",
+  "tags": [
+    "zabbix",
+    "semob"
+  ],
+  "timezone": "browser",
+  "editable": true,
+  "graphTooltip": 1,
+  "refresh": "1m",
+  "schemaVersion": 39,
+  "version": 1,
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "annotations": {
+    "list": []
+  },
+  "links": [],
+  "templating": {
+    "list": [
+      {
+        "name": "host",
+        "label": "Host",
+        "type": "query",
+        "datasource": {
+          "type": "alexanderzobnin-zabbix-datasource",
+          "uid": "${DS_ZABBIX}"
+        },
+        "query": {
+          "queryType": "host",
+          "group": "/.*/",
+          "host": "/SEMOB/",
+          "application": "",
+          "itemTag": "",
+          "item": ""
+        },
+        "definition": "",
+        "current": {
+          "text": "SEMOB DF",
+          "value": "SEMOB DF"
+        },
+        "hide": 0,
+        "refresh": 1,
+        "multi": false,
+        "includeAll": false,
+        "sort": 1,
+        "regex": "",
+        "options": []
+      },
+      {
+        "name": "operadora",
+        "label": "Operadora",
+        "type": "query",
+        "datasource": {
+          "type": "alexanderzobnin-zabbix-datasource",
+          "uid": "${DS_ZABBIX}"
+        },
+        "query": {
+          "queryType": "item",
+          "group": "/.*/",
+          "host": "$host",
+          "application": "",
+          "itemTag": "",
+          "item": "/^Operadora \\[.*\\]: registros$/"
+        },
+        "definition": "",
+        "regex": "/Operadora \\[(?<value>\\S+) - (?<text>[^\\]]*)\\]/",
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "hide": 0,
+        "refresh": 1,
+        "sort": 3,
+        "options": []
+      },
+      {
+        "name": "linha",
+        "label": "Linha (prefixo)",
+        "type": "textbox",
+        "query": "",
+        "current": {
+          "text": "",
+          "value": ""
+        },
+        "hide": 0,
+        "options": []
+      },
+      {
+        "name": "janela",
+        "label": "Registro nos últimos",
+        "type": "custom",
+        "query": "5 min : 300,15 min : 900,1 h : 3600,24 h : 86400",
+        "current": {
+          "text": "5 min",
+          "value": "300"
+        },
+        "hide": 0,
+        "multi": false,
+        "includeAll": false,
+        "options": [
+          {
+            "text": "5 min",
+            "value": "300",
+            "selected": true
+          },
+          {
+            "text": "15 min",
+            "value": "900",
+            "selected": false
+          },
+          {
+            "text": "1 h",
+            "value": "3600",
+            "selected": false
+          },
+          {
+            "text": "24 h",
+            "value": "86400",
+            "selected": false
+          }
+        ]
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "marcusolsson-dynamictext-panel",
+      "title": "",
+      "pluginVersion": "6.1.0",
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Mixed --"
+      },
+      "transparent": true,
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "${DS_INFINITY}"
+          },
+          "type": "json",
+          "source": "url",
+          "parser": "backend",
+          "format": "table",
+          "url": "https://geoserver.semob.df.gov.br/geoserver/ows",
+          "url_options": {
+            "method": "GET",
+            "data": "",
+            "params": [
+              {
+                "key": "service",
+                "value": "WFS"
+              },
+              {
+                "key": "version",
+                "value": "2.0.0"
+              },
+              {
+                "key": "request",
+                "value": "GetFeature"
+              },
+              {
+                "key": "typeNames",
+                "value": "semob:ultima_posicao"
+              },
+              {
+                "key": "outputFormat",
+                "value": "application/json"
+              },
+              {
+                "key": "count",
+                "value": "10000"
+              },
+              {
+                "key": "propertyName",
+                "value": "id_operadora,prefixo,cd_linha,velocidade,direcao,latitude,longitude,dataregistro"
+              }
+            ]
+          },
+          "root_selector": "features",
+          "columns": [
+            {
+              "selector": "properties.prefixo",
+              "text": "prefixo",
+              "type": "string"
+            },
+            {
+              "selector": "properties.id_operadora",
+              "text": "id_operadora",
+              "type": "string"
+            },
+            {
+              "selector": "properties.cd_linha",
+              "text": "cd_linha",
+              "type": "string"
+            },
+            {
+              "selector": "properties.velocidade",
+              "text": "velocidade",
+              "type": "string"
+            },
+            {
+              "selector": "properties.direcao",
+              "text": "direcao",
+              "type": "string"
+            },
+            {
+              "selector": "properties.latitude",
+              "text": "latitude",
+              "type": "number"
+            },
+            {
+              "selector": "properties.longitude",
+              "text": "longitude",
+              "type": "number"
+            },
+            {
+              "selector": "properties.dataregistro",
+              "text": "dataregistro",
+              "type": "timestamp"
+            }
+          ],
+          "filterExpression": "(id_operadora ?? 'desconhecida') =~ '^${operadora:regex}$' && startswith(cd_linha ?? '', '${linha}')",
+          "computed_columns": [],
+          "filters": []
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "alexanderzobnin-zabbix-datasource",
+            "uid": "${DS_ZABBIX}"
+          },
+          "queryType": "0",
+          "schema": 13,
+          "resultFormat": "time_series",
+          "group": {
+            "filter": "/.*/"
+          },
+          "host": {
+            "filter": "$host"
+          },
+          "application": {
+            "filter": ""
+          },
+          "itemTag": {
+            "filter": ""
+          },
+          "item": {
+            "filter": "/^Operadora \\[.*\\]: /"
+          },
+          "macro": {
+            "filter": ""
+          },
+          "proxy": {
+            "filter": ""
+          },
+          "trigger": {
+            "filter": ""
+          },
+          "tags": {
+            "filter": ""
+          },
+          "textFilter": "",
+          "evaltype": "0",
+          "functions": [],
+          "options": {
+            "showDisabledItems": false,
+            "skipEmptyValues": false,
+            "disableDataAlignment": false,
+            "useZabbixValueMapping": false,
+            "useTrends": "default"
+          }
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "alexanderzobnin-zabbix-datasource",
+            "uid": "${DS_ZABBIX}"
+          },
+          "queryType": "0",
+          "schema": 13,
+          "resultFormat": "time_series",
+          "group": {
+            "filter": "/.*/"
+          },
+          "host": {
+            "filter": "$host"
+          },
+          "application": {
+            "filter": ""
+          },
+          "itemTag": {
+            "filter": ""
+          },
+          "item": {
+            "filter": "/^Posições: /"
+          },
+          "macro": {
+            "filter": ""
+          },
+          "proxy": {
+            "filter": ""
+          },
+          "trigger": {
+            "filter": ""
+          },
+          "tags": {
+            "filter": ""
+          },
+          "textFilter": "",
+          "evaltype": "0",
+          "functions": [],
+          "options": {
+            "showDisabledItems": false,
+            "skipEmptyValues": false,
+            "disableDataAlignment": false,
+            "useZabbixValueMapping": false,
+            "useTrends": "default"
+          }
+        },
+        {
+          "refId": "D",
+          "datasource": {
+            "type": "alexanderzobnin-zabbix-datasource",
+            "uid": "${DS_ZABBIX}"
+          },
+          "queryType": "0",
+          "schema": 13,
+          "resultFormat": "time_series",
+          "group": {
+            "filter": "/.*/"
+          },
+          "host": {
+            "filter": "$host"
+          },
+          "application": {
+            "filter": ""
+          },
+          "itemTag": {
+            "filter": ""
+          },
+          "item": {
+            "filter": "/^(Frota|WFS: camadas)/"
+          },
+          "macro": {
+            "filter": ""
+          },
+          "proxy": {
+            "filter": ""
+          },
+          "trigger": {
+            "filter": ""
+          },
+          "tags": {
+            "filter": ""
+          },
+          "textFilter": "",
+          "evaltype": "0",
+          "functions": [],
+          "options": {
+            "showDisabledItems": false,
+            "skipEmptyValues": false,
+            "disableDataAlignment": false,
+            "useZabbixValueMapping": false,
+            "useTrends": "default"
+          }
+        },
+        {
+          "refId": "E",
+          "datasource": {
+            "type": "alexanderzobnin-zabbix-datasource",
+            "uid": "${DS_ZABBIX}"
+          },
+          "queryType": "0",
+          "schema": 13,
+          "resultFormat": "time_series",
+          "group": {
+            "filter": "/.*/"
+          },
+          "host": {
+            "filter": "$host"
+          },
+          "application": {
+            "filter": ""
+          },
+          "itemTag": {
+            "filter": ""
+          },
+          "item": {
+            "filter": "/^Camada \\[.*\\]: registros$/"
+          },
+          "macro": {
+            "filter": ""
+          },
+          "proxy": {
+            "filter": ""
+          },
+          "trigger": {
+            "filter": ""
+          },
+          "tags": {
+            "filter": ""
+          },
+          "textFilter": "",
+          "evaltype": "0",
+          "functions": [],
+          "options": {
+            "showDisabledItems": false,
+            "skipEmptyValues": false,
+            "disableDataAlignment": false,
+            "useZabbixValueMapping": false,
+            "useTrends": "default"
+          }
+        },
+        {
+          "refId": "F",
+          "datasource": {
+            "type": "alexanderzobnin-zabbix-datasource",
+            "uid": "${DS_ZABBIX}"
+          },
+          "queryType": "0",
+          "schema": 13,
+          "resultFormat": "time_series",
+          "group": {
+            "filter": "/.*/"
+          },
+          "host": {
+            "filter": "$host"
+          },
+          "application": {
+            "filter": ""
+          },
+          "itemTag": {
+            "filter": ""
+          },
+          "item": {
+            "filter": "/^Response time for step/"
+          },
+          "macro": {
+            "filter": ""
+          },
+          "proxy": {
+            "filter": ""
+          },
+          "trigger": {
+            "filter": ""
+          },
+          "tags": {
+            "filter": ""
+          },
+          "textFilter": "",
+          "evaltype": "0",
+          "functions": [],
+          "options": {
+            "showDisabledItems": false,
+            "skipEmptyValues": false,
+            "disableDataAlignment": false,
+            "useZabbixValueMapping": false,
+            "useTrends": "default"
+          }
+        },
+        {
+          "refId": "G",
+          "datasource": {
+            "type": "alexanderzobnin-zabbix-datasource",
+            "uid": "${DS_ZABBIX}"
+          },
+          "queryType": "5",
+          "schema": 13,
+          "showProblems": "problems",
+          "resultFormat": "table",
+          "evaltype": "0",
+          "group": {
+            "filter": "/.*/"
+          },
+          "host": {
+            "filter": "$host"
+          },
+          "application": {
+            "filter": ""
+          },
+          "proxy": {
+            "filter": ""
+          },
+          "trigger": {
+            "filter": ""
+          },
+          "tags": {
+            "filter": ""
+          },
+          "item": {
+            "filter": ""
+          },
+          "itemTag": {
+            "filter": ""
+          },
+          "macro": {
+            "filter": ""
+          },
+          "options": {
+            "acknowledged": 2,
+            "minSeverity": 0,
+            "severities": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "count": false,
+            "limit": 100,
+            "useTimeRange": false,
+            "fetchHistoricalItemValue": true
+          }
+        }
+      ],
+      "description": "Painel único em tema claro, com abas. Posições vindas do GeoServer da SEMOB pelo Infinity; nomes de empresa, cadastro, catálogo, disponibilidade e problemas vindos do Zabbix. Requer o plugin Business Text 5.6 ou superior.",
+      "options": {
+        "renderMode": "data",
+        "editors": [
+          "afterRender",
+          "styles"
+        ],
+        "wrap": false,
+        "status": "",
+        "editor": {
+          "format": "auto",
+          "language": "html"
+        },
+        "content": "<div class=\"sm-host\"></div>",
+        "defaultContent": "<div class=\"sm-host\"></div>",
+        "helpers": "",
+        "contentPartials": [],
+        "externalStyles": [
+          {
+            "id": "leaflet",
+            "url": "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"
+          },
+          {
+            "id": "inter",
+            "url": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+          }
+        ],
+        "styles": "/* SEMOB/DF · painel operacional. Tema claro fixo, independente do tema do Grafana. */\n.sm {\n  --paper: #FFFFFF;\n  --canvas: #F4F6F4;\n  --ink: #16211C;\n  --ink-2: #5A6963;\n  --line: #DFE5E1;\n  --line-2: #EEF2EF;\n  --focus: #1F6FD1;\n  --r: 12px;\n  color: var(--ink);\n  background: var(--canvas);\n  font-family: Inter, \"Segoe UI\", system-ui, -apple-system, sans-serif;\n  font-size: 13px;\n  line-height: 1.45;\n  font-variant-numeric: tabular-nums;\n  padding: 14px;\n  border-radius: var(--r);\n  display: flex;\n  flex-direction: column;\n  gap: 12px;\n}\n.sm *, .sm *::before, .sm *::after { box-sizing: border-box; }\n.sm h1, .sm h2, .sm p, .sm dl, .sm dd, .sm dt, .sm ul, .sm li { margin: 0; padding: 0; }\n.sm ul { list-style: none; }\n.sm button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }\n.sm :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 6px; }\n.sm .ic { width: 18px; height: 18px; flex: none; }\n\n/* cabeçalho */\n.sm-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }\n.sm-brand { display: flex; align-items: center; gap: 12px; }\n.ic-brand { width: 30px; height: 30px; color: #1F6FD1; }\n.sm-head h1 { font-size: 22px; font-weight: 650; letter-spacing: -.01em; }\n.sm-head p { color: var(--ink-2); font-size: 12.5px; }\n.sm-stamp { display: flex; align-items: center; gap: 6px; color: var(--ink-2); font-size: 12px;\n  background: var(--paper); border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; }\n\n/* KPIs */\n.sm-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(176px, 1fr)); gap: 10px; }\n.sm-kpi { background: var(--paper); border: 1px solid var(--line); border-radius: var(--r);\n  padding: 11px 13px 9px; display: flex; flex-direction: column; gap: 1px; overflow: hidden; }\n.sm-kpi-top { display: flex; align-items: center; gap: 7px; color: var(--a); font-size: 11.5px; font-weight: 550; }\n.sm-kpi-top span { color: var(--ink-2); }\n.sm-kpi strong { font-size: 27px; font-weight: 640; letter-spacing: -.02em; line-height: 1.25; }\n.sm-kpi-h { color: var(--ink-2); font-size: 11.5px; }\n.sm-spark { width: calc(100% + 26px); height: 30px; margin: 4px -13px -9px; display: block; }\n\n/* abas */\n.sm-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); padding-bottom: 0; }\n.sm-tab { display: flex; align-items: center; gap: 7px; padding: 9px 14px; color: var(--ink-2);\n  border-bottom: 2px solid transparent; margin-bottom: -1px; border-radius: 8px 8px 0 0; }\n.sm-tab:hover { color: var(--ink); background: var(--line-2); }\n.sm-tab.on { color: var(--ink); border-bottom-color: #1F6FD1; font-weight: 600; background: var(--paper); }\n.sm-pane[hidden] { display: none; }\n.sm-pane { display: flex; flex-direction: column; gap: 12px; }\n\n/* mapa */\n.sm-mapwrap { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 12px; }\n@media (max-width: 1100px) { .sm-mapwrap { grid-template-columns: 1fr; } }\n.sm-map { position: relative; height: clamp(380px, 48vh, 620px); border: 1px solid var(--line); border-radius: var(--r);\n  overflow: hidden; background: var(--paper); }\n.sm-leaflet, .sm-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }\n.sm-tiles .leaflet-tile-pane { filter: saturate(.35) brightness(1.06) contrast(.95); }\n.sm-mapmsg { position: absolute; left: 12px; right: 12px; bottom: 12px; font-size: 11.5px; color: var(--ink-2);\n  background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; }\n.sm .leaflet-container { background: var(--canvas); font: inherit; }\n.sm-mapbtn, .sm-maplg { background: var(--paper); border: 1px solid var(--line); border-radius: 8px;\n  box-shadow: 0 1px 3px rgba(22, 33, 28, .12); color: var(--ink); }\n.sm-mapbtn { padding: 7px 12px; font-size: 12px; }\n.sm-mapbtn:hover { background: var(--line-2); }\n.sm-maplg { padding: 9px 11px; font-size: 11.5px; max-width: 250px; }\n.sm-maplg b { display: block; margin-bottom: 4px; }\n.sm-maplg p { color: var(--ink-2); display: flex; align-items: center; gap: 6px; }\n.sm-maplg i { width: 7px; height: 7px; border-radius: 50%; background: #5A6963; flex: none; }\n.sm-maplg i.big { width: 11px; height: 11px; }\n.sm-pop { font-size: 12px; min-width: 196px; }\n.sm-pop header { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }\n.sm-pop header b { font-size: 15px; margin-right: 2px; }\n.sm-pop header i { width: 9px; height: 9px; border-radius: 50%; flex: none; }\n.sm-pop header span { color: #5A6963; }\n.sm-pop dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; }\n.sm-pop dt { color: #5A6963; }\n.sm-pop dd { text-align: right; }\n\n/* painel lateral do mapa */\n.sm-aside { display: flex; flex-direction: column; gap: 8px; height: clamp(380px, 48vh, 620px); min-height: 0; }\n.sm-legend { display: flex; flex-direction: column; min-height: 0; flex: 1; gap: 4px; }\n.sm-legend-h { flex: none; }\n.sm-legend-list { display: grid; grid-auto-rows: minmax(44px, 1fr); gap: 6px; min-height: 0; }\n.sm-search { flex: none; display: flex; align-items: center; gap: 8px; background: var(--paper);\n  border: 1px solid var(--line); border-radius: 10px; padding: 8px 11px; color: var(--ink-2); }\n.sm-search input { flex: 1; min-width: 0; border: 0; background: none; color: var(--ink); outline: none; }\n.sm-msg { flex: none; color: var(--ink-2); font-size: 11.5px; min-height: 14px; }\n.sm-search input::placeholder { color: var(--ink-2); }\n.sm-legend h2 { font-size: 12.5px; font-weight: 600; }\n.sm-hint { color: var(--ink-2); font-size: 11.5px; margin-bottom: 6px !important; }\n.sm-emp { width: 100%; text-align: left; background: var(--paper); border: 1px solid var(--line);\n  border-left: 3px solid var(--a); border-radius: 10px; padding: 6px 9px; transition: background .15s;\n  display: flex; flex-direction: column; justify-content: center; gap: 4px; overflow: hidden; }\n.sm-emp:hover { background: var(--line-2); }\n.sm-emp.off { opacity: .4; }\n.sm-emp-t { display: flex; align-items: center; gap: 7px; }\n.sm-chip { width: 9px; height: 9px; border-radius: 50%; background: var(--a); flex: none; }\n.sm-emp-n { font-weight: 600; font-size: 12px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n.sm-emp-v { font-size: 13px; font-weight: 650; flex: none; }\n.sm-bacia { font-size: 10px; color: var(--ink-2); border: 1px solid var(--line); border-radius: 999px; padding: 0 7px; flex: none; }\n.sm-track { position: relative; height: 4px; border-radius: 3px; background: var(--line-2); overflow: hidden; flex: none; }\n.sm-track i { position: absolute; inset: 0 auto 0 0; display: block; }\n.sm-fill { background: var(--a); opacity: .3; }\n.sm-fill-m { background: var(--a); }\n.sm-emp-s { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px; text-align: center; }\n.sm-emp-s b { display: block; font-size: 11.5px; font-weight: 600; }\n.sm-emp-s span { color: var(--ink-2); font-size: 9.5px; }\n\n/* cartões e grades */\n.sm-grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 12px; }\n.sm-grid3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 12px; }\n.sm-card { background: var(--paper); border: 1px solid var(--line); border-radius: var(--r); padding: 14px 16px; }\n.sm-card header { margin-bottom: 10px; }\n.sm-card h2 { font-size: 14px; font-weight: 620; }\n.sm-card header p { color: var(--ink-2); font-size: 11.5px; }\n.sm-wide { width: 100%; }\n\n/* rosca */\n.sm-donut-wrap { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }\n.sm-donut { width: 230px; height: 230px; flex: none; }\n.d-arc { transition: opacity .15s; cursor: default; }\n.sm-donut:hover .d-arc { opacity: .45; }\n.sm-donut .d-arc:hover { opacity: 1; }\n.d-big { font-size: 27px; font-weight: 640; fill: var(--ink); }\n.d-small { font-size: 11px; fill: var(--ink-2); }\n.sm-dlg { flex: 1; min-width: 160px; display: flex; flex-direction: column; gap: 5px; }\n.sm-dlg li { display: flex; align-items: center; gap: 8px; font-size: 12px; }\n.sm-dlg i { width: 9px; height: 9px; border-radius: 2px; flex: none; }\n.sm-dlg .n { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n\n/* radar, dispersão, colunas, rosa */\n.sm-radar { width: 100%; max-width: 330px; margin: 0 auto; display: block; }\n.r-grid { fill: none; stroke: var(--line); stroke-width: 1; }\n.r-lab { font-size: 9.5px; fill: var(--ink-2); }\n.r-area { transition: fill-opacity .15s; }\n.sm-radar:hover .r-area { fill-opacity: .03; }\n.sm-radar .r-area:hover { fill-opacity: .3; }\n.sm-rlg { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 8px !important; font-size: 11.5px; }\n.sm-rlg li { display: flex; align-items: center; gap: 6px; }\n.sm-rlg i { width: 9px; height: 9px; border-radius: 2px; }\n.sm-scatter, .sm-cols, .sm-rose { width: 100%; display: block; }\n.sm-cols { height: 190px; }\n.sm-rose { height: 215px; }\n.sm-scatter { height: 250px; }\n.sc-dot { transition: r .12s; }\n.sc-dot:hover { r: 7; }\n.v-lab { font-size: 9.5px; fill: var(--ink-2); }\n.v-val { font-size: 10px; fill: var(--ink); font-weight: 600; }\n\n/* barras horizontais */\n.sm-bars { display: flex; flex-direction: column; gap: 3px; }\n.sm-barrow { display: grid; grid-template-columns: 62px 1fr 44px; align-items: center; gap: 9px;\n  padding: 3px 5px; border-radius: 6px; font-size: 12px; }\n.sm-barrow:hover { background: var(--line-2); }\n.sm-barrow .k { font-weight: 600; text-align: left; }\n.sm-barrow .tr { height: 9px; background: var(--line-2); border-radius: 5px; overflow: hidden; }\n.sm-barrow .tr i { display: block; height: 100%; border-radius: 5px; }\n.sm-barrow .v { color: var(--ink-2); text-align: right; }\n\n/* tabelas */\n.sm-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }\n.sm-table th { background: var(--line-2); color: var(--ink-2); font-weight: 600; font-size: 11.5px;\n  text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; position: sticky; top: 0; }\n.sm-table th:first-child { border-radius: 8px 0 0 0; }\n.sm-table th:last-child { border-radius: 0 8px 0 0; }\n.sm-table th button { font: inherit; color: inherit; }\n.sm-table th[aria-sort=\"descending\"] button::after { content: \" ↓\"; }\n.sm-table th[aria-sort=\"ascending\"] button::after { content: \" ↑\"; }\n.sm-table td { padding: 8px 10px; border-bottom: 1px solid var(--line-2); }\n.sm-table td.num, .sm-table th.num { text-align: right; }\n.sm-table td.desc { color: var(--ink-2); }\n.sm-table tbody tr:nth-child(even) { background: #FAFBFA; }\n.sm-table tbody tr:hover { background: #EFF4FB; }\n.sm-table tbody tr.click { cursor: pointer; }\n.sm-table td .sm-chip { display: inline-block; margin-right: 7px; vertical-align: middle; }\n.sm-tag { font-size: 11px; padding: 2px 9px; border-radius: 999px; border: 1px solid; }\n.sm-tag.ok { color: #1D7A3A; border-color: #BFE3CB; background: #F1F9F3; }\n.sm-tag.warn { color: #8A5A00; border-color: #F1DDA6; background: #FDF7E8; }\n.sm-tag.bad { color: #A41E1E; border-color: #F0C2C2; background: #FDF1F1; }\n\n.sm-foot { color: var(--ink-2); font-size: 11px; max-width: 95ch; }\n\n@media (prefers-reduced-motion: reduce) {\n  .sm *, .sm *::before, .sm *::after { transition: none !important; animation: none !important; }\n}\n\n/* aba Cadastros e Problemas */\n.sm-barlist-wide .sm-barrow { grid-template-columns: 136px 1fr 56px; }\n.sm-bars-2 { columns: 2; column-gap: 26px; }\n@media (max-width: 900px) { .sm-bars-2 { columns: 1; } }\n.sm-barrow-w { grid-template-columns: 160px 1fr 62px; break-inside: avoid; }\n.sm-lines { width: 100%; height: 190px; display: block; }\n.sm-empty { display: flex; align-items: center; gap: 10px; color: var(--ink-2); background: #F1F9F3;\n  border: 1px solid #BFE3CB; border-radius: 10px; padding: 14px 16px; }\n.sm-empty .ic { color: #1D7A3A; }\n.sm-sev { display: inline-block; font-size: 11px; padding: 2px 10px; border-radius: 999px; border: 1px solid; white-space: nowrap; }\n.sm-sev.sn { color: #4A5551; border-color: var(--line); background: #F6F8F7; }\n.sm-sev.si { color: #1C5F96; border-color: #C3DCF0; background: #F1F7FC; }\n.sm-sev.sw { color: #8A5A00; border-color: #F1DDA6; background: #FDF7E8; }\n.sm-sev.sm { color: #9A4B00; border-color: #F3CFA6; background: #FDF3E9; }\n.sm-sev.sh { color: #A41E1E; border-color: #F0C2C2; background: #FDF1F1; }\n.sm-sev.sd { color: #FFFFFF; border-color: #8E1616; background: #A41E1E; }\n\n/* falha de montagem */\n.sm-error { border: 1px solid #F0C2C2; background: #FDF1F1; }\n.sm-error h2 { font-size: 15px; font-weight: 620; color: #A41E1E; }\n.sm-error p { font-size: 12.5px; }\n\n\n/* =============================================================================\n   Camada de redesenho \"Mobilidade clara\". Mantém as cores, a tinta e a fonte Inter\n   do painel original; ajusta hierarquia, espaçamentos, vazios e o uso no celular.\n   ===========================================================================*/\n.sm {\n  --accent: #1F6FD1;\n  --accent-soft: #EAF2FC;\n  --accent-ink: #185BAD;\n  --ok: #1D7A3A;\n  --ok-soft: #EDF7F0;\n  --sh-1: 0 1px 2px rgba(22, 33, 28, .05), 0 6px 18px -10px rgba(22, 33, 28, .14);\n  --sh-2: 0 2px 6px rgba(22, 33, 28, .07), 0 16px 32px -14px rgba(22, 33, 28, .22);\n  --r: 14px;\n  --gap: 16px;\n  font-family: Inter, \"Segoe UI\", system-ui, -apple-system, sans-serif;\n  font-feature-settings: \"cv11\" 1, \"ss01\" 1;\n  font-size: 13.5px;\n  padding: 20px 22px 18px;\n  gap: var(--gap);\n  min-height: 100%;\n  box-sizing: border-box;\n  -webkit-font-smoothing: antialiased;\n}\n\n/* ---------------------------------------------------------------- cabeçalho */\n.sm-head { gap: 16px; padding-bottom: 2px; }\n.sm-brand { gap: 14px; }\n.sm .ic.ic-brand { width: 44px; height: 44px; padding: 10px; border-radius: 12px; color: #fff;\n  background: linear-gradient(135deg, #1F6FD1 0%, #2E9E44 140%); box-shadow: 0 8px 20px -10px rgba(31, 111, 209, .7); }\n.sm-head h1 { font-size: 24px; font-weight: 700; letter-spacing: -.022em; line-height: 1.2; }\n.sm-head p { font-size: 13px; margin-top: 2px; }\n.sm-stamp { gap: 8px; font-size: 12.5px; padding: 7px 14px; box-shadow: var(--sh-1); }\n.sm-stamp::before { content: \"\"; width: 8px; height: 8px; border-radius: 50%; background: #2E9E44;\n  box-shadow: 0 0 0 3px rgba(46, 158, 68, .18); animation: sm-pulse 2.4s ease-in-out infinite; }\n@keyframes sm-pulse { 50% { box-shadow: 0 0 0 6px rgba(46, 158, 68, 0); } }\n\n/* ---------------------------------------------------------------------- KPIs */\n.sm-kpis { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }\n.sm-kpi { position: relative; border-color: transparent; box-shadow: var(--sh-1); padding: 14px 16px 0; gap: 2px;\n  transition: box-shadow .2s ease, transform .2s ease; }\n.sm-kpi:hover { box-shadow: var(--sh-2); }\n.sm-kpi::before { content: \"\"; position: absolute; left: 0; top: 0; right: 0; height: 3px; background: var(--a); opacity: .9; }\n.sm-kpi-top { gap: 9px; font-size: 12.5px; font-weight: 600; }\n.sm-kpi-top .ic { width: 28px; height: 28px; padding: 6px; border-radius: 9px; color: var(--a);\n  background: color-mix(in srgb, var(--a) 12%, #fff); }\n.sm-kpi strong { font-size: 30px; font-weight: 700; letter-spacing: -.03em; line-height: 1.15; margin-top: 8px; }\n.sm-kpi-h { font-size: 12px; padding-bottom: 12px; }\n.sm-kpi .sm-spark { width: calc(100% + 32px); margin: -6px -16px 0; height: 34px; }\n.sm-kpi:has(.sm-spark) .sm-kpi-h { padding-bottom: 0; }\n\n/* ---------------------------------------------------------------------- abas */\n.sm-tabs { gap: 4px; border: 0; padding: 4px; background: #E7ECE9; border-radius: 12px; width: fit-content; max-width: 100%;\n  overflow-x: auto; scrollbar-width: none; }\n.sm-tabs::-webkit-scrollbar { display: none; }\n.sm-tab { gap: 8px; padding: 8px 14px; border: 0; margin: 0; border-radius: 9px; white-space: nowrap; font-weight: 500;\n  transition: background .15s, color .15s, box-shadow .15s; }\n.sm-tab:hover { background: rgba(255, 255, 255, .6); }\n.sm-tab.on { background: var(--paper); color: var(--accent-ink); font-weight: 650; box-shadow: 0 1px 2px rgba(22, 33, 28, .08), 0 4px 10px -6px rgba(22, 33, 28, .25); }\n.sm-tab.on .ic { color: var(--accent); }\n.sm-stage { flex: 1; display: flex; flex-direction: column; min-height: 0; }\n.sm-pane { flex: 1; gap: var(--gap); }\n\n/* ------------------------------------------------- mapa ocupa a altura útil */\n.sm-pane:has(> .sm-mapwrap) { min-height: 0; }\n.sm-mapwrap { flex: 1; gap: var(--gap); grid-template-columns: minmax(0, 1fr) 340px; min-height: 520px; }\n.sm-map, .sm-aside { height: auto; min-height: 520px; }\n.sm-map { border-color: transparent; box-shadow: var(--sh-1); border-radius: var(--r); }\n.sm-mapbtn, .sm-maplg { border-radius: 10px; box-shadow: var(--sh-1); border-color: transparent; }\n.sm .sm-mapbtn { padding: 8px 14px; font-weight: 600; background: var(--paper); color: var(--ink); }\n.sm .sm-mapbtn:hover { background: var(--accent-soft); color: var(--accent-ink); }\n.sm-maplg { padding: 12px 14px; }\n.sm .leaflet-bar { border: 0 !important; box-shadow: var(--sh-1) !important; border-radius: 10px !important; overflow: hidden; }\n.sm .leaflet-bar a { width: 34px !important; height: 34px !important; line-height: 34px !important; color: var(--ink) !important; }\n\n/* lateral: busca e empresas sem aperto, com rolagem quando precisar.\n   No desktop a lateral não impõe altura: acompanha o mapa e a lista rola */\n@media (min-width: 901px) { .sm-aside { contain: size; } }\n.sm-aside { gap: 10px; }\n.sm-search { padding: 10px 14px; border-radius: 12px; border-color: transparent; box-shadow: var(--sh-1); }\n.sm-search:focus-within { box-shadow: 0 0 0 2px var(--accent), var(--sh-1); }\n.sm-search .ic { color: var(--accent); }\n.sm-search input { min-height: 24px; align-self: stretch; }\n/* um contorno só: o da caixa; o campo interno não desenha outro */\n.sm .sm-search input:focus, .sm .sm-search input:focus-visible { outline: none; box-shadow: none; }\n.sm-search.on { box-shadow: 0 0 0 2px var(--accent), var(--sh-1); }\n.sm-msg { font-size: 12px; color: var(--accent-ink); font-weight: 500; }\n.sm-msg { min-height: 0; }\n.sm-msg:empty { display: none; }\n.sm-legend { gap: 8px; }\n.sm-legend h2 { font-size: 13.5px; font-weight: 650; }\n.sm-hint { font-size: 12px; margin-bottom: 0 !important; }\n.sm-legend-list { grid-auto-rows: auto; align-content: start; gap: 8px; overflow-y: auto; padding: 2px 4px 4px 2px; scrollbar-width: thin; }\n.sm-emp { border: 0; border-left: 4px solid var(--a); padding: 10px 12px 10px 12px; gap: 8px; border-radius: 12px;\n  box-shadow: var(--sh-1); transition: box-shadow .15s, opacity .15s, transform .15s; }\n.sm-emp:hover { background: var(--paper); box-shadow: var(--sh-2); }\n.sm-emp.off { opacity: .45; box-shadow: none; background: transparent; }\n.sm-emp-n { font-size: 13px; }\n.sm-emp-v { font-size: 15px; font-weight: 700; letter-spacing: -.01em; }\n.sm-bacia { font-size: 10.5px; font-weight: 600; padding: 1px 8px; color: var(--ink-2); background: var(--line-2); border-color: transparent; }\n.sm-track { height: 5px; }\n.sm-emp-s { gap: 4px; padding-top: 2px; }\n.sm-emp-s b { font-size: 12.5px; font-weight: 650; }\n.sm-emp-s span { font-size: 10.5px; }\n\n/* --------------------------------------------------------- cartões e grades */\n.sm-grid2, .sm-grid3 { gap: var(--gap); align-items: stretch; }\n.sm-card { border-color: transparent; box-shadow: var(--sh-1); border-radius: var(--r); padding: 18px 20px; display: flex; flex-direction: column; }\n.sm-card header { margin-bottom: 14px; }\n.sm-card h2 { font-size: 15px; font-weight: 650; letter-spacing: -.01em; }\n.sm-card header p { font-size: 12.5px; margin-top: 2px; }\n.sm-pane > :last-child { flex-grow: 1; }\n\n/* gráficos ocupam a largura do cartão, sem faixa vazia ao lado */\n.sm-donut-wrap { flex: 1; gap: 28px; justify-content: center; }\n.sm-donut { width: 240px; height: 240px; }\n.sm-dlg { gap: 8px; max-width: 360px; }\n.sm-dlg li { font-size: 13px; padding: 4px 8px; border-radius: 8px; }\n.sm-dlg li:hover { background: var(--line-2); }\n.sm-scatter, .sm-cols, .sm-lines { height: auto; aspect-ratio: 4 / 3; max-height: 360px; flex: 1; }\n.sm-cols, .sm-lines { aspect-ratio: 16 / 9; }\n.sm-radar { max-width: 380px; overflow: visible; padding: 0 40px; box-sizing: content-box; }\n.sm-rose, .sm-scatter, .sm-cols, .sm-lines, .sm-donut { overflow: visible; }\n.sm-rose { height: auto; max-height: 280px; }\n.v-lab, .r-lab { font-size: 10.5px; }\n.v-val { font-size: 11px; }\n\n/* barras */\n.sm-bars { gap: 4px; }\n.sm-barrow { padding: 5px 8px; font-size: 12.5px; gap: 12px; }\n.sm-barrow .tr { height: 10px; }\n/* barras com nome de empresa: coluna do rótulo larga o bastante, sem quebrar em duas linhas */\n.sm-barrow[title] { grid-template-columns: minmax(130px, 34%) 1fr 52px; }\n.sm-barrow .k { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }\n/* listas de barras distribuídas na altura do cartão, sem vazio embaixo */\n.sm-card > .sm-bars:not(.sm-bars-2) { flex: 1; justify-content: space-between; }\n\n/* tabelas: longas rolam dentro do cartão, cabeçalho fixo */\n.sm-tscroll { overflow: auto; border-radius: 10px; border: 1px solid var(--line-2); }\n.sm-tscroll.long { max-height: 520px; }\n.sm-table { font-size: 13px; }\n.sm-table th { font-size: 11.5px; letter-spacing: .02em; padding: 10px 12px; background: #F3F6F4; z-index: 1; }\n.sm-table td { padding: 10px 12px; }\n.sm-table tbody tr:nth-child(even) { background: #FAFBFA; }\n.sm-table tbody tr:hover { background: var(--accent-soft); }\n.sm-tag, .sm-sev { font-weight: 600; padding: 3px 10px; }\n\n.sm-empty { padding: 16px 18px; border-radius: 12px; }\n.sm-foot { font-size: 11.5px; line-height: 1.5; padding-top: 2px; }\n\n/* ---------------------------------------------------------------- celular */\n@media (max-width: 900px) {\n  .sm { padding: 14px 12px; --gap: 12px; }\n  .sm-head h1 { font-size: 20px; }\n  .sm .ic.ic-brand { width: 38px; height: 38px; padding: 8px; }\n  .sm-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }\n  .sm-kpi { padding: 12px 12px 0; }\n  .sm-kpi strong { font-size: 24px; margin-top: 4px; }\n  .sm-kpi .sm-spark { width: calc(100% + 24px); margin: -4px -12px 0; }\n  .sm-tabs { width: 100%; }\n  .sm-tab { padding: 10px 12px; min-height: 44px; }\n  .sm-mapwrap { grid-template-columns: 1fr; }\n  .sm-map { min-height: 420px; }\n  .sm-aside { min-height: 0; }\n  .sm-legend-list { overflow: visible; }\n  .sm-emp { min-height: 44px; }\n  .sm .sm-mapbtn { min-height: 44px; }\n  .sm-maplg { max-width: 190px; padding: 8px 10px; font-size: 11px; }\n  .sm-maplg p { gap: 5px; }\n  .sm-search { min-height: 46px; padding: 6px 14px; }\n  .sm-search input { min-height: 34px; font-size: 16px; }\n  .sm-grid2, .sm-grid3 { grid-template-columns: 1fr; }\n  .sm-donut { width: 200px; height: 200px; }\n  .sm-tscroll.long { max-height: 440px; }\n}\n@media (prefers-reduced-motion: reduce) {\n  .sm-stamp::before { animation: none; }\n}\n\n/* Identidade: logo do GDF e sigla SEMOB-DF acima do título */\n.sm .sm-logo { width: 56px; height: 56px; flex: none; border-radius: 50%; display: block;\n  box-shadow: 0 6px 16px -8px rgba(31, 111, 209, .6); }\n.sm .sm-head p.sm-org { color: var(--accent-ink); font-size: 12px; font-weight: 700; letter-spacing: .12em;\n  text-transform: uppercase; margin: 0 0 2px; }\n@media (max-width: 900px) {\n  .sm .sm-logo { width: 46px; height: 46px; }\n}\n",
+        "afterRender": "/* =============================================================================\n * SEMOB/DF · Painel operacional (Business Text, afterRender)\n *\n * Consultas:\n *   A  Infinity  camada semob:ultima_posicao (GeoJSON WFS 2.0)\n *   B  Zabbix    itens \"Operadora [id - nome]: ...\" (tradução dos códigos e séries por empresa)\n *   C  Zabbix    itens \"Posições: ...\" (tendência e qualidade do feed)\n *   D  Zabbix    itens \"Frota...\" (cadastro de veículos)\n *   E  Zabbix    itens \"Camada [...]: registros\" (catálogo WFS)\n *   F  Zabbix    itens do cenário web (disponibilidade do GeoServer)\n *   G  Zabbix    problemas ativos do host\n *\n * Abas: Mapa, Empresas, Linhas, Qualidade, Cadastros e Problemas. Troca por JS, sem recarregar.\n * Tema claro fixo. Cores das empresas conforme identidade visual das bacias do DF.\n * Pessoas físicas (permissionários do STPCR) não são identificadas: entram em \"Outros\".\n * ===========================================================================*/\nconst root = context.element;\nconst rv = context.grafana.replaceVariables;\nconst series = (context.panelData && context.panelData.series) || [];\nconst LEAFLET = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';\nconst OTHERS = 'Outros';\n\n/* Todo o corpo roda dentro de try: uma falha mostra a causa no painel, nunca uma área vazia. */\ntry {\n\n  /* ---------------------------------------------------------------- utilitários */\n  const vals = (f) => (f ? (f.values && f.values.toArray ? f.values.toArray() : Array.from(f.values || [])) : []);\n  const num = (v) => {\n    if (typeof v === 'number') return isFinite(v) ? v : NaN;\n    const s = String(v === null || v === undefined ? '' : v).trim().replace(',', '.');\n    return /^-?\\d+(\\.\\d+)?$/.test(s) ? parseFloat(s) : NaN;\n  };\n  const txt = (v) => String(v === null || v === undefined ? '' : v).replace(/[\\u0000-\\u001f\\u007f]/g, '').trim();\n  const fmt = (n, d = 0) => (isFinite(n) ? n.toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d }) : '–');\n  const pct = (a, b) => (b > 0 ? (a * 100) / b : 0);\n  const mean = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : NaN);\n  const quant = (a, q) => {\n    if (!a.length) return NaN;\n    const s = a.slice().sort((x, y) => x - y), i = (s.length - 1) * q, lo = Math.floor(i), hi = Math.ceil(i);\n    return s[lo] + (s[hi] - s[lo]) * (i - lo);\n  };\n  const age = (s) => {\n    if (!isFinite(s)) return '–';\n    if (s < 60) return Math.round(s) + ' s';\n    if (s < 3600) return Math.round(s / 60) + ' min';\n    if (s < 86400) return (s / 3600).toFixed(1).replace('.', ',') + ' h';\n    return Math.round(s / 86400) + ' d';\n  };\n  const ROSE = ['N', 'NE', 'L', 'SE', 'S', 'SO', 'O', 'NO'];\n  const rose = (d) => ROSE[Math.round((((d % 360) + 360) % 360) / 45) % 8];\n  const el = (tag, cls, text) => {\n    const e = document.createElement(tag);\n    if (cls) e.className = cls;\n    if (text !== undefined) e.textContent = text;\n    return e;\n  };\n  const svg = (tag, attrs, parent) => {\n    const e = document.createElementNS('http://www.w3.org/2000/svg', tag);\n    Object.keys(attrs || {}).forEach((k) => e.setAttribute(k, attrs[k]));\n    if (parent) parent.appendChild(e);\n    return e;\n  };\n  const svgText = (parent, x, y, s, cls, anchor) => {\n    const t = svg('text', { x, y, class: cls || 'v-lab', 'text-anchor': anchor || 'middle' }, parent);\n    t.textContent = s;\n    return t;\n  };\n  /* ícones de linha única, desenhados com path (sem fonte de ícone nem emoji) */\n  const ICON = {\n    bus: 'M5 17V6a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v11M5 17h14M5 17v2M19 17v2M6 9h12M8 13h.01M16 13h.01',\n    route: 'M6 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM18 9a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM16 7H9a3 3 0 0 0 0 6h6a3 3 0 0 1 0 6H8',\n    speed: 'M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm1.5-2.5L17 8M4 19a9 9 0 1 1 16 0',\n    clock: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM12 7v5l3 2',\n    signal: 'M4 18v-4M9 18v-8M14 18V6M19 18v-11',\n    alert: 'M12 9v4M12 17h.01M10.3 4l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3l-8-14a2 2 0 0 0-3.4 0Z',\n    pin: 'M12 21s7-6 7-11a7 7 0 1 0-14 0c0 5 7 11 7 11ZM12 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z',\n    grid: 'M4 6h16M4 12h16M4 18h16M8 4v16M16 4v16',\n  };\n  const icon = (name, cls) => {\n    const s = svg('svg', { viewBox: '0 0 24 24', class: 'ic ' + (cls || ''), 'aria-hidden': 'true' });\n    svg('path', { d: ICON[name], fill: 'none', stroke: 'currentColor', 'stroke-width': 1.7, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, s);\n    return s;\n  };\n\n  /* ------------------------------------------------- empresas e cores oficiais */\n  const C = { PIRACICABANA: '#2E9E44', PIONEIRA: '#F2C200', URBI: '#1F6FD1', MARECHAL: '#FF7F11', 'SÃO JOSÉ': '#5C3317', COOBRATAETE: '#9E9E9E' };\n  const C_OTHERS = '#D62828';\n  const names = {};\n  series.forEach((s) => {\n    const c = [s.name];\n    (s.fields || []).forEach((f) => {\n      c.push(f.name, f.config && f.config.displayNameFromDS, f.config && f.config.displayName);\n      if (f.labels) c.push(Object.values(f.labels).join(' '));\n    });\n    c.forEach((v) => {\n      const m = /Operadora \\[(\\S+) - ([^\\]]+)\\]/.exec(v || '');\n      if (m) names[m[1]] = m[2].trim();\n    });\n  });\n  const short = (n) => (n.replace(/^(AUTO VIAÇÃO|VIAÇÃO|EXPRESSO)\\s+/i, '').split(/\\s+-\\s+|\\s+BACIA/i)[0] || n).trim();\n  const groupOf = (id) => {\n    const full = names[id];\n    if (!full) return { key: OTHERS, name: OTHERS, full: 'Permissionários do STPCR e códigos sem nome', color: C_OTHERS, bacia: '' };\n    const b = /BACIA\\s*-?\\s*0?(\\d)/i.exec(full);\n    const label = short(full);\n    const color = Object.keys(C).find((k) => full.toUpperCase().indexOf(k) >= 0);\n    return { key: id, name: label, full, color: color ? C[color] : '#6B47B8', bacia: b ? b[1] : '' };\n  };\n\n  /* ------------------------------------------------------------- dados de GPS */\n  const gps = series.find((s) => (s.fields || []).some((f) => f.name === 'latitude'));\n  const col = (n) => vals(gps && gps.fields.find((f) => f.name === n));\n  const now = Date.now();\n  const janela = parseInt(rv('${janela}'), 10) || 300;\n  const rows = [];\n  if (gps) {\n    const id = col('id_operadora'), pf = col('prefixo'), ln = col('cd_linha'), vl = col('velocidade'),\n      dr = col('direcao'), la = col('latitude'), lo = col('longitude'), ts = col('dataregistro');\n    for (let i = 0; i < la.length; i++) {\n      const t = ts[i] instanceof Date ? ts[i].getTime() : (typeof ts[i] === 'number' ? ts[i] : Date.parse(ts[i]));\n      const y = num(la[i]), x = num(lo[i]);\n      const key = id[i] === null || id[i] === undefined || id[i] === '' ? 'desconhecida' : String(id[i]);\n      rows.push({\n        g: groupOf(key), prefixo: txt(pf[i]), linha: txt(ln[i]), vel: num(vl[i]), dir: num(dr[i]), lat: y, lon: x,\n        t, idade: isFinite(t) ? (now - t) / 1000 : NaN,\n        okc: isFinite(y) && isFinite(x) && Math.abs(y) <= 90 && Math.abs(x) <= 180 && !(y === 0 && x === 0),\n      });\n    }\n  }\n  const live = rows.filter((r) => r.okc && r.idade <= janela && r.idade >= -120);\n  const mov = live.filter((r) => r.vel > 0);\n  const speeds = mov.map((r) => r.vel);\n  const semLinha = live.filter((r) => !r.linha).length;\n  const mudos = rows.filter((r) => r.idade > 86400).length;\n  const semCoord = rows.filter((r) => !r.okc).length;\n\n  /* agrupamentos */\n  const G = {};\n  live.forEach((r) => {\n    const g = G[r.g.key] || (G[r.g.key] = Object.assign({}, r.g, { n: 0, mov: 0, sp: [], linhas: {}, semLinha: 0, idades: [] }));\n    g.n++; g.idades.push(r.idade);\n    if (r.vel > 0) { g.mov++; g.sp.push(r.vel); }\n    if (r.linha) g.linhas[r.linha] = 1; else g.semLinha++;\n  });\n  const empresas = Object.values(G).sort((a, b) => (a.key === OTHERS) - (b.key === OTHERS) || b.n - a.n);\n  const L = {};\n  live.forEach((r) => {\n    if (!r.linha) return;\n    const l = L[r.linha] || (L[r.linha] = { k: r.linha, n: 0, mov: 0, sp: [], ops: {}, idades: [] });\n    l.n++; l.idades.push(r.idade); l.ops[r.g.key] = (l.ops[r.g.key] || 0) + 1;\n    if (r.vel > 0) { l.mov++; l.sp.push(r.vel); }\n  });\n  const linhas = Object.values(L).sort((a, b) => b.n - a.n);\n\n  /* ------------------------------------------------------------------ layout */\n  root.innerHTML = '';\n  const app = el('div', 'sm');\n  root.appendChild(app);\n\n  const head = el('div', 'sm-head');\n  const brand = el('div', 'sm-brand');\n  const logo = el('img', 'sm-logo');\n  logo.src = \"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAYAAADDPmHLAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAC1CSURBVHhe7V0HeFRV9j8zSQi9W3DFuoq4tnWL7oq6u+qu7v5dKyqCJBBIMiWhSRWkKKIIKIL03ntLSDIlM5PeCQkQegkllNBCUWp+/+/c+14yeQkILJkZMOf7fl+SyWtzz7mn3/uIbjfqkVqHwuNbUbjlDTLYjGSwjiSjdT4ZbHYy2HLJaNtBRtt+MliPkMF2jIwMazEZrEVktO0mo3UDGWwJZLAtJZN9LJlsPclkf4ci7U+RIbqJ9nY15G0Ki32ADPHvktH2DRntFjLZd5PBepG6JYF6poN6ZoB6pIO6p4K6JYMiE0ERCaAIlwYJ8n98XvcUeQ6fy+C/jXaQ0XaIjLYUMtknkMkWRBH2x2kw9NpHqqHqJJ7hBvvfyWQfQUZ7GhltZwWDemZKJjMTzQ6QSTDsJsEOMsVLIRH3UoTKYLtMRtsmMtkmkcH6LkUk3qF93Bq6GTTY6U9GxytkjB9PJvtOwWTB8BSQ2anOTs+DBU1oGtYSqSwkh8lkX0xmV9sac3EzKCL+YTLHDyKzYyNF8kBnyhl+U2f3zYJdmhI2Oz3SQCbHfjI7x1OE9Xnt16qhXyKz/UUyO+eRyXFGMJ1tt08y/SqITJACyxrK7LRThPN9enmwv/ar1pA7maz/IrMjVs6kDEW9VzG4txLYd2CNwCbC7MglsyOEImICtV/9101Gy0tkjo8T9pSdKx407UDe8rCDuikOpNmZRxGO9tph+PVRpPURinDNFTP+tmV8FWBBkH5CIplsf9MOy+1PbZfUIqNjAJmdJcJO/loYXwF2KQQcWpqd0yks6jfaYbo9KczyAkU4sqhXpvSaKw3Mrwws/HIsDpDB1lE7XLcPtV3iRyb7MIpIuCgkXzsQv2pYIcJcHhezYyEZo+/WDt+tTV3WPkpmp4t6ZSmevbWKQaiBCHV5jCJcu8kY97p2GG9NMlneoUjXEeH9ar9wDaqAVTqJEQmlZLJ/ph3OW4uM8QNFaMeomfXXAavUlNJBXkSdVzXQDq1vU+jkADLGzyrLhFX6gjW4NqgmwZlBnaPv1w6zb1LQysZkdsaJB7/V0re+CpE8cu2mLtHPaIfbt4i9V5MzQzBf+yVq8D/ACuqRyn5BMRlj2miH3Teoa2wLinCuF2q/0heowf8Oqyx/RyScJEPMy9rh9y5Frr6LTI486en7kLMX6gJ1Taz4Wec0UHAGKJyzj+qzWuWx/HlQBiiEO4CquJ7XwRFCMsicUELhsS9q2eAdCrU1IpMjU858LzM/3AEycPcOMzQBzT5djvsGzAd1TZAOVbgD7af2Q49FYQiMiC0Xgi7JaP7pCkQuNGLI6g54YeR3Ugj4Wtp7eB1qmOg6Tl1jn9Wyw7MUmh1A5nirT9j8kGToFcZTpzQ8OXQ6CovuxOkzddBu8kBQhxy0GjILuEQACB9N/QwUnC6E44H+i7Ct8F7xOUoJOE8In90d1DlVagaG9n5eBZsDLi8795PB9pCWLZ4jo3W2TzC/SxJCZ/fExv0PYFn6i6gb5kTX2d0kQ0FYldEG9EkOmvRcjYT8p5Cz4xHc22+xEAoKysRE25vy2FMKzhNOFddFvcgYNOwWg2a9Vop7VLqvV2GV3Ufm+HwKcjbWsqb6yWgZKNW+l9VkaALu6rMUl0r8ymZ3jwUGNI2IhTP/aWRub42nhk0FfZItmN2i7xKY5kUiYn43vDRqNKhjNuKynpPnqgJwmnD+RC30WRyG3fta4FBxM/x3/DDf9A3EBLRHadlTvRQW+5Z0RryQ5GG7zDZdVcthTjTqEYXCfXeVzfjOM3qDPs4TDuBr343EJ9P749nhE/HK2NHYXXQ3cIGAyyR+jo19F0NWdpTnnlYE4CJhw/YHkbbxd2XXTNn4O+Er+J5foCSLDJYRWjZVD7HNMTuOi+qVp50+QzyoaxJ+M2AhGvVcJdUyM6RDLp4dPgnTk99A8Iw+glH6sARMd74h1Dkz8PJhHS5k+APn3Bh9Rtr8z1cGY2Hy3+WxPxP2FN2F54dPROisnrh8Qg8cJwxc3klGCeqzhDlBXRJ9QyC4O5lDREPsu1p23VzipkaTPckr4Z7BDl1oAoavbo9Tp+pi7+E78M/vvwEFZcE834zEgqcEei4PQ62wFHSc2qfMoRPYSsAMArboBJPL1P0FZXYHZeFvo0ahz7Iu+POIH0EfFuCf477BhT0BwB7CgqRXUNeshItdE1G3+1o88vmc8shD+7yeBtdbTI5jZIyvxpRxWNwwrzl9XZKFLRfMY4Dg2PAMwub0kIy+qGArYZuzJU6l1ANWEZCtHM+Mn0pAqk5qATeHL72gNV76diys6/+Ig4eaobi4EVYlvYjdW1tI3+CsvF/76X1BHbPQrOcaJG58GhcuBODThWEyWtA+r8fBTmEmmwK7lm03h4yW5ygi4ZJn7b5Vqv1O6aB2eXhgwAKpvhUGJuU8jZxtj0oB+ImAdAKmE7CWgEzl95kEOAkoImA+Abnl56saIGnTEzh6qJFkNpsFFhi+j52AYuWzS4T5Kf+AY/3vsX9Hc6BQCkVUxl9E2Cl9k8TKiSePwq4IgbWbln3/G3EPHy+sFJ08HlT94fHQGewImtEHA1Z1xp29V8K8MALYpgdchJLt9XHeWQvYTMBeAuYRMJdQukyH0iIdEKUIwBQCNhAKM+7ExSI/6dixIwhCzpZHsDrjr/JvVSgYLFApOqBAHrduy8NI3KA4hT8Tzm6vjXG2d9Ci71KRg+Bo5OFBc/DwoNkyF6H9Lp4C9xianGfI6Pytlo03TgZLf6+o/s6p+GJVhzJPvGD7fVie9CJwTCccM6HyMwiYRsCcAGCuTtr5JMXu8+xNIyEsexPvwqsTRuHtiUMxxfkGbHlPY3hUOzSJjMHqtDYVw0AlFORrLHW+jNfHjBIp5OBpfcqeZZLzTREWvvDtWPgbHHhlzEicPV0bZ88E4v/GDfdiyMimIIO1QIyWjTdG3ZwPiBU6LFmVblaNYNUf5sSWHfdJRvOMzCNgt6LCmUEqsgj4uh4wJVCagZPK52y7+dwCwnlbIE4fr4t1Ox/Bq8zQ9rkyEdR+fXkiqEQjBKWEf477Gs8Mmo3hUR3QbaERPRnzI9Gg5xrYc38vzhsb9z6GuAnqOOu7wqms9J08BS7Ds7bmBav/MxniFoquVU+qfgar1Xb5wusXA8txO89stuXMWPeZyrM3ww9IUJJBbLNVNc4CwxrCpZNaoZRw/kwAnv9qApp0jxbJofv7L0LJidryHnxtxelz5j2DnosMZeaCsSLtRXEOh6AFO1uKz+zrn0XLPssQlf087Bt+j8eGzFTqD1V8L0+B8zQG23axmvqGyWT7i+xb93DfftcEPPPlZPzfuK9Qy2xF15mfYsjyYGzbcl9FB04FM/wIAdsVYVDjfGZ4MgGzCDjgZhbiCedyauPQsaZYlf0XtPx0BZ4dOg2JBU/g7IlaOHGsPuYnv4KHBs3F7j13y/NUYSsl/PuH4agbmoiQOZ9iwMoQPNhvMeqb4/DmhC/QcsACkV0UAuxtIeCJa7B+qmXrtROHFLxiR3vh6kRIMv44fCJ+PhUoZte3MW1BH24CvbsT421vVVTVqppnXCAMj/4Y1nV/kELCqv8C4WhKY2CbokFKdMBaHTBROoVq6njnvruhC3eJ7GG9HmvQoOdqkfSp2z0KZ44GSk2iRh8XCJ8t7YLMzY/izM+1MWBpJzQwW7F5V0shHIeONEWbb8fh2S+n4J5+i7zoC/ACVY5I7EfIZGumZe0vk9H6ilyV6+HZH5yOtpMGlalcS+4fRA7gvl6r0HrwTBwvblDuEzBTDuqAw4ScjY+AOmcK2/vGD1/DOC8Sf/vue0ywvi1Dwl2KhphMwHIdcFTRHMqsHrP6PXScNBgdp/cX3ryoFHZOw3Tnv+SzsNO5jnAg/Q70X95Fhp6XCfv23oEOUwdIAeNn2ks4n19baI2jxxvig4mfe1cIZJp4iJa9v0xGi83js58R7kDdiFiMt76FqNy/4r2JQ2Bd/wecPRWIqKy/oOP0vsja2UrOak70sOdvI+zYfg86Th+AHosMSNv8OBLyn8bUqP/gwnF/wfhSpx4/pdcGrOxH6MoFiMF5Ao4mFF+DfYSv17QTUUhtow2jLB/g5/Q6QLQOF/b6Y2rSf7AivQ32HW2Ovku6oEWvlSgqai7PTyCRORQCAcLBQ03RgH0NTh1rv6snwMvUjbYjFBLXVMviK1OE83kZT3p49qvg9Cpn19rnYqJV8dCV7F//VSF4f/ogOcic1Nmuk14/q/P1cpaKwecZyulflzyv5Gg9mOdGSnvOGoSvx+dwppBNAkcYqn+hOIHdlhlAH2wGdVyHwt1KVvAcoTivERanvYxxtrdB4U7xrA8OnIeOUwchM+sxYB9fVw9sIRwtbICGvVd5t6fgun0Bg22BVxZycDaNs2qibSsT9MEmLE9tIwWgWAekEA6svROHsxtLz1wp3giGsRCs5HyAkhTiz48TSjN0KNhxH8LndQN1zkJq5uPSJLj8gHV6YKEeWKOoeDV64J8lhNPZ9RCV1gb9l4dgmvN1+RycGOJQUxGyr1a3l8LaOQXUNROu+GeABUryaRrheEJDPDFiqnQKtd/XU5DrMnZc274EvOuW0f6TZ1O+kvkBRhsGLu+McZa3EDKjJ4as6oTwuT2w/+Ad0nljdZ+oMJlnv1rUYYad0AErdTL9m6mX/ztPKD7SCHUi14LabsHr40eg+GAjIJUk0+f5A5NrA8cUraA6lox4AhaVa56o9c/jzyMmwpHyjBQ+/ryUM4m/lZm/4Ez0XR4iBYOFxKkHcmThiU0SJ4uEZtN+b09B5gXaatldmYyWQV7p7A1JwXNfj5ez7CDJ9C4PfM5zeO+7oSjN95Ne/CY5s0qj/IDTuvKQjxnCdnySEvopNljM0E5paNl3MQoPKD0DzGzO5Vv8gEFNgKWB8m/2CxiHOHTUARMCgESdvO5mwl29luOv48bi0gk/YId8zu+i3ge12wAKTUT25lZSONiUsLngZ+B7nSfc+9kCmXxi55LNAbevacegOiEFwKpld0XiHj+DdYvw/rUXqG6EOdH805VI2PQkDm1oIu3oDkJpEuHIrsZSAzDz2ZvnWW7TA2fdBEAt4qQTdrtaIL/wIQyPag/D3G7i9xM76gEWEhGDmKFcGGIMrA/0ry/Vdq5O+g7r9YC5ETC0rjyG6wnzCXs2tMDEVW/iwuYAIFYvMpBb9rRE8PR+ImzM3vyoZDqbI2EqZC2hdJcflia/jPnJrwlz0pjDTO5l8KQQcM+A0X6RTLZHtWwvJ96tQtSVvVDf5sEQyZNENOkei2GrPpEzb6cyi3IkIy5xUwd72u4ZQWY+/86zciNhput1tBkxAa+M+0aey0zhWc2mg9X+PL1k+GLuEdADYwOV/+mALMXUjKoNzNDJz1kA2GzwM/A5/Ew8w3m2s8BwqXjGAEQuNklzskYHzFaKU9/XAgY2kAKthLbrtz2E5iwEnnYMRUbXNlDL9nIyWCcoB3kYspv3zt7L0KLPYtBHG9F5Vi85YKyS1bTuMUJ6emu8PGYsDh5pVq7O2YHj2c0Zv3zJnPMn/XEmp46cjSwgDBacz+sB3wUCS2TlUNj5nTpgvQ6I1gPz/WSSiM/bqJzDs7lQJ4WGmRqlk/mHXTqUFviLiOTorkZ4ePgc7LTcI5+DBYAFaWgD4IcAYLV8fvEcIAxd2aFih5En0J3Tw9ZcGjy4it1NBztrk8GyR2aPqji5OtElCU8MnY6iw81w8mR9PDVsOnouDpWzi7N+aravhLBp4/0IMMWjSY9ojIr9EJk7WuGnrEDAopN2XHUM+Sf3BTADWXiU8/FjHWB0bWCRDlihhIqqzd6lA9J05U0gavMJaxCOGNgczPAHBtcHJtUCFrJWYY1BwFLCOtujKNlcT2oINiciyvCTwsaCs0VxTi8RojP+qjSSeFDbclhvdpRSuO33Wvbz7H/Za5swBmeg/bT+ZSoybG430W4lwjxWs6y+uTljFqE0VY+Dx5tg+Jr2ojuHq3LHDjUsV8kqs5mprA2YQZz1U7x24UOwqTigl7ORmcv/4+N55q/TtIwx+H+s/kcFAt0bA2FNpIlYSlIIGMxgDi+Z2ZyPYGF06oCv6gAD6gMT/IDNenktEEZGfSgdQu1YVDdkw0gV+w4YrCO84v0zOPsXGYPRMe9iqusN3PHpCpGX77UkHMeLGgDLSLZzsZpnda8M4uzEV9F6+HSU/qSTRZ69OpkgKtIDp3RSILL1OLWtAc6eroWMTY/hg4lDUbC3pdQGeXog3R/YqpNCs1+5jpoiVgWAzYwjAAhrDEQ2AsyNge/dBIBNA4PvHUPAiFqS8ewvTPYDjCw0jaQTy7WHvS1wb5+l3mkc4QUlBmuilv2c/EmXu2JXcVJ1QqzmcYlESr0eMViY+g+kb38cz30zHvRmESbHvikHlsu6zBQlSaOq6AWWV/BznGLTVc9+oU46YvmEU4fr4XfDpqNlv0XQmWygjzbhk2n9ZGl5mk4mbGYSSlLq4d2pQ7Bn/11Si7APwD9ZC7EGWqAHejcETI2Bbo2B6f7yniwA7CRy3oAFjnsPezQCQpsCkwKkEEz0A+bUQklGQ4yyfoB7+y6RLeaeLrEzIpxcJj5DYXa3XckMcS3JYPV88ofRNRFPDpuKpM1PYX/OnZK5IOTnPIhes8zYs+5uOQO17dz806F0/MTpJBPcZyOr5BmE4/YGaP3lTBmDhzpFiXYtLwTha2zVA3k6YJsOF0/4473pQxEX+ycgloDVOnl9jjY4GuHrTQ+QzP+svvybHT1GnOLg8TMe0QOTA4EBDYARDWW4yn4GCJt33y8LQxzteDIErAC7qgXcmkV4H5/yPfE9i6AsfBv9gbT/hYSL2/xRyt435/T5M3bUeLayXeYZqf7kAg7P3mQ9cEQnzQR73+yQMVgglss+gaLi5nhg0EJQ+zwRg584qlQUVdvPOEG4tNkfl7ndjJ1HbiLha8zRA9NqSc3C1+VIIVcvk038XBwhqPUDFio+n1PSQhP5Acf0Zb5N6oYnpNrnbiftOHgSckXX6HIBMFq/8Zr975Ik6v+bCh9ATM6f0XlabxTlNiv3wpnRPKMP66Qq5kQOe9fqDOQZzA4gN4SkEkqj9QIibmd7zsJymbAu/bdYmPAqcgsexaXkABmXu0cMGTrJUBYM1kJcJOJ08eRaQJ/GwApO7SrHq6lgFe7+Av/N57Lw8DOm+omU8IVd/njzxy98o4WcNYDR5uYHcIrQW3v3sSrsmgD/LkkImdMLRcebodSql+VeZgar4PGBcjaxPeVkzYCGwLC6QBQ7e26NIYKhOgn+nT9jAeBogIVov6JVUpRFIuxXqNVBrhqy567OZIWxpRu4XhCAUs4V8HGq+bkS+Fn4nqwZWHOMqyXK1uc3++OVsd96tzdABW/Qya/M6caLSsUbOKyFSt3YOxBVwHREZT8nB5mbPLnixmEbF32sAbLFm5n4QyAQ3hTo0wDgeoCa5HFngLuvwJqBnTVmOBeSVF8iWYdSmx6nT9RBVMbz2LDuwfIw0n02c8Jnvk4mi7ThYVVgAeJIhQVgYl2UOmqVRS1znK97PvlTFWQ+gJ3BPxGFx7YS79gRueIqDvYUuqZh2qr/yDDKocPgZZ0wZtX7MqZWmcF9fRZ/4McAmcHjNC2nbq/EmHOE0u36cr+A6wlqJFFKOHGoIe4buBDvTBuGHan3SNvPWkF1OhXfQISfLAi/NPuFD8CZQsU8jaoDTPQvW1tgnNNNLnLRfndvQOxKau9AZLS97rX8v4owJwIiY0VvnkjaHCJszHoIW2Pul7OenTk2Cay+WZ2zbWUB4J/srbPNdrfD6kzkGb3VD5jNGTmuIOpRelIvZ/luwk+J9TB5xVu4xAtAmdEiPewncwPpfsJ7/6k4EAX591d0QLX3chM4kVIWzqMSpWQTLrn8MGzlJ/Dj5hFvO4AqRL+H5UuicItJbDSgPcCT6JKIO/otw/6C5pJxzGTOqrEjJ3Lqivo/QijlZAp/xiEfe9pLdDIK4PNURjCTuKTMsflSPTCooaz6RftJm8+OJEcMbPf5XuwTcEaQHcPh9YAxtWXBKIoQ7Xgedw9biuM7GsgMIvsRqp1X76eaHRYA7kVgc8PPxhoLhKPFjRDAW9L40iYT8qVXC9kBHOmV7h8VYQ40jFyLzK2thMN3an09HF3fWA5skr6c2cwwLtMyY3nms0DwIK9QVgmp6pkFge0+aw0+hzXFlADA0AT4vp5kNDuWHOuz5uBGUa4XsHZh730223s/4KD0L05uq4eUrCdwfidXEd3ifmYuM5y1gsgcKplHFhAOXbeUt6GvTuK8Pw+4F7WsFjLpl8ICMN+rGqBrIh4aOEcOJAjb9/4GMbnPSYZsVsqqajFlo14ykG01awV1FrvPRmYK1+HVxBCDo4dZfkCSHyzJf8In44chMe8JcY/zx/wxL+Y15GxvhSPxTWUjilpXYGHj89kv4PtyRpKZy/kHviaHpVw/iOHMo15okqKdTfHVgg5I3doa5zcFiHzB4QON8daEL7zbFqYF130M1l2cArYrcaF3INb9u0R3bdaO1qIlnNfZlXXTsBofxbn1urKDZw/PUEUAOBfPPgMfpxaBLupQ6vJXEjFu2kOZ5YOWh4De2456PaPw7sQh+P3wiaCQDPibnVgb97zoMC5bUm7XyXOZ0WqYydqGIxPOEUz1l8/BoekynTBZ2zffi8AebNZSsaHgISlIICTnPwkK4Qycj2gBGQoeZQHI9UoHkDt4UHh2cOs0/wxJRpeZvZC//yFczA0Avqkvwz+2rVMJl9P02OG4FxfT/GX1jpM4rHpZ9WfrUTqlHvB9oJylrEGi5doBZmLn6b2lJ8734gZUzsl3SsfHM/pLBrN658IT+xrMZGa2u4Zhdc8agk3HXL3MHXCSinsSFS02zvq26GkYY3m3LAs4aHmwbHbVfndvQQrACY4CdnilB6AqqB4yN09+uAnPDJ2Cn4rqSFu6Tydr7DmEnzbVxry0f+F8ToBU9dwixvX5sbXlzOcwMbQJMLyOjP05gmBtYSG0m/SZwgi3mRiUib7LQiSzRFWQsGDVP1C0vbk0KVV5+5yn4J6Ckwrj1cjgHCFvxwOiXdzfaEP7aZ/h/UmDxTJ3n4kAGPJtLcdZAPZ7fOXv1WCIh3+4A9/GfYiivGZyFnKbt9psyT/Z6+cZyL+z587RAq8OjmgiZyWfs7AWSmcF4jIzhVU62+5jhOic50Ed1isZOUUIQl24p+9SZGxuhUvn/ZC05Qk06RGLRN4kiu9RlQBwgYjvwxqBhUaNQi4QsrY8KtcLsJbhmr/YQMKHmM8oEwBOCfrSu3s6peG9iZ/L2cjMnaqUdnmG8UzjwWcfgFW0Gpczk2L9gIl6IJ9TwYoHfsYPb4//Fu+PjsT5EulA8sZPo9d+gHHWt6BjTcMmgBkV6kKtiFi0HjYDelMc6L0MdJrZVz6HewJI+BmEn3YE4uJmP3nvYj1wWGkw4cUry0J8I+N3NZQLgO2YTwlAcCa6LTDIgecBZ5vMlT627xx6HSXs3PobXCj2V8IvxUNnb5wdMnbY2EZfIuw88DRmZ5Wi8/xDeGLIJDw+cIIwLxu2PYTUjb+DPsyJVp/Pxj39F0mzw7M2KAEUZMUnMzdhzabTiM0Nl/fgtDQzm7VRLiF7fStMS/03LnHCiLUOVw0TCFHJf0Ugp1q9uQbgWuBmAnxLAEITcF+/xdi19x4pBEcJ2+Lvky1hbHOzCR9OHYRRcW3l/7lxgyuCGToUJTTDxWx/kUTK2/wwHv9iEl4dvRyzMoqwPP9nNOeFkh878MLI8fjP2G8QaLKg9BSJfX+Eh945Dg27xWN+djFmZ53Do5/ng4KT8cLI7zEq9iOk5D8hM33sU5wlHE9tiMtcmUzXA4lyrcDypJfEVnY+4+1fCeUCYC32KQHgLpmuSWL3z46z+qLNqB8wO+lfMlXL3vY5QmYB21gHIpeYcCqnnswTpOhwcGMzXOKETRFh7Np3xZZvPHNfGjkQH0wqRN7BM3jss40wz+mImJw/Qdc1UWwx99aEYaCODtzTJwFJu89gSMwWvP79Z3h4wES5xp8jk3d2ImKBUQodmxd+Ho4yeE0hawc2R/z5aUIr3iDCl7J+VcHNBBT5lBMooLSJ8U4cHXOQuam1HGSlTHv0UAO0GjwLQ5YHoSSlfvl+QewYsroGYV7KK2g7cTCStv1ObtzU1oHXxuUg9+BZtBwYjzrG1eU7kAUnoY7ZhoRdJWg3ay8GLn1DXOPE8fq4h/cUDs5As57RWGv7s7wH+wGseTiycN91TDFJjw6ZJTeRrPS9fAhuJmC3z4SBVaFTmpilYuYpy72+if4QP6qbRXCCh5nC27ektsE3q9pjbvKr+O3nzPQtuKfvIkx1voH6PdeA2sXCuHgLlq0/BgrmiENpywqKwWjnXoxx7gX9Nx2LU16W1y4m/PO7r6HvmoT1ux6Ss55T0Fyn4BXHWfXkZzzz2RkFITrzOeh9oevnl+AWBWyQq0erOMgXwLY01IWOM/pgVsrr6L0kDH4hKRi0Ilgy6TRh2MKO+GjKYAREWKTWECuMU/DRpEHovsCIcbHvo16PKFBoPKhzLGILjuK1H3PF79TVgkeHpiJl10nUNrjw3NAJaDd9AJzpvxfRxqGiphiyOkjOembyMUJxdhN0nNYf9w1YhhFrP8K+g3fg8JEmQvCa8xa23t4a5lrgZgISvNINfD1Ql40LyMWVtSLixFqCf/0wAhSSLt/0oXreYk/hRDjzn8RE639FVk5cg7uCg2LQbsYGzEwrAgXHiL+HrN2FAWt2gdrZsaOwBTbtuB+jYhQnE4RZrn8is+Cxsr+/iO4gr8l2PiRFrE1o+ilvKS/3C/Rew+d1wE0AlnplJ5D/CVb5tg+xjcsV6hgGu4jr/c1xFT3yMCvu7p+ImE1HERjBGiEOS9cdxnMjM0HBdrz07Ri8+M1YPPvlZBTsuR/5ux7CwwPn4jf9FmNY9EcInxspMnwVwjwlj+Dznr87ZAfYXjYBY71aDq5OiNheY4sNVuiMNqzKP4KWnyVBb7RhzYZi3NUvARRmKatFsBqvZWYBsshZzWAtw0JX4X1Dtyhk/Sebw8Bet60AVAWD1AKLcg7ht0OSERhpx6q8I2jYi1O3GqYKAfLxhM6NQm77u9K7awK8AUUDrMg7gvsGJkFvsmFNfjHu6ssa4Baf1dcDueX/aCJz3NNktJd6bUMoTyPMiiafuhC98Sjq9uBaQByW5x7Bk8PTQF3jKh9/u0L4fZYw+do3o/Wwb2UDqxGdY/HSmGwsWXcYFBInooBxrn3oNHeT+L3S8bcjuAFYJP/iX1JXBqX4fCh4s/DJWox17kXksq2S4Z1j8e8J67E89zAoOLby8bcjeA2owXqKjM67FQGw/3jbO4KcA+gUi98OTkHm3lNoKpw+i/AJ9GFWxG87gdfGrxMCIo7Vnn87QWwkbV1HRDopAOGWoFsvF3CdCIpBo8h4pBeWoN3MDTIJpP6vcyye/zYTGw6ewcMDk6QQcLSgvcbtAjnZp7qvDWxNRvslr68O0iLUIlK1NwzFxvPM//voLGTsO4VeK7ZVZL6KoBi0nZqH/INn0XZKnnAOqWOMvIb2utcD/g7ae3kbYrLbg8sFYLDTn4y2Al+rCdw/MAmth6XisaHXh1ZDU/DYsFS0GZ0F86ItWJJzGJatx/HGuHVSIK40u4Ni8Mev0hG18ShW5Rej1/Jt+PvYHLT+QrlmFfe6Koal4pEhKfAzcz9gFffzBuQkv0jh8a3KBYDJYJvkM34AV+kMNnxp3YMVecVYtO7wdWNx7mHMyz6EEbY9+Bfb9nCr0ASV7qVF5zgx+/86OguDY3ZhbtZBLMk9Uun614Kl649gWloRGvZy+U6OQWQArXk0GJqdwsI4IeThXat+CTxrhDDcAJjhrMYVT198pr3+lcD3Vc0H/+Rraa9/PdBe35uotDmESj3impLB6lvtYWUCoP5+A9Be80agveb1Qns9b4Hjf+79CLf8Q8t+SUbbEq8uE6tB9UIsB7PsoSBnbS3rJfFu0t7aKaQG1Q/58q8ftGwvp4iYhmSwHvLqbiE1qB5wrYf5yi8CuyoZrT96bcOoGlQfxNvFr7RPsDtFOv5AZqdvVwfZMVSTRPyTvXTtMTWoCJ7U4bZILburpnCLyyd9AWY4h2ZhFjTo5cSd/RPRrA+rNbvM7nG4pz2Hwbl9PpfzAFzwuRL42nydK2Xv+Docz//SddzBx3o7EpCR3TEKdTbXsrpqMsS/KwXAR3ICPIBBMWjRLxF9V22Hc8cJ7Dt5Dsd+uogjZy5g/YHT+N61D89+zS1bsZWTLiFxeH1CLmamF2Fa6oFKmJ5ahKkpBzAsbjfempKHJp/yErGYypqliwXPjEjHjLSqr6MFHzfWtQ8NelbRbeRJyA2ix2rZfGXi1LDButEnSsRKBi9k3iYcOX0BV6NLpcBI6x7oeAZzpU+9RscYfB6zS3v4FWn/yXPos3K7ZBprDvU6QbFoO22D9vCrUikgmlArXMeT4NKvyXGOjHHX+TZxLhb4Qmo4OAa9Vm7XjutVaWrqAZnBU7NwQTHovXqH9rBfpCW5h+HHAqjO3uBYvDU5T3vYL9Ld/ZO8JwAc+oVbZ2rZ+8s0eGMtMlg3e1ULBMfitR/WaccTazcdxQdT8/CnkZn4x/fZGOPYi0uXea6V03vT3Uq+VQiAa/sJ/Ojai4nJ+zE5eT+iNhSj+GxlDfONvbD8OlUIQN6B0+I6k5L3V8LklP0Y7Sj0ngng2W92nK9c+LlWCrd8JHwBb+whGG5FgMGG/AOnKwz4V7Y9kiFcqmWnj3//OFrU+N2J6/66UKUmUIUAfDRjA+h9fkewXBzC12rR24UpqQcqHMeCxZU9oVGqEIAv43aXX6dKeMsJtMrXxoZbJmrZeh0EHRni0rwSEQTH4p/jcysMdsaekqpr7MzkYLnkixUBo+TcJbQYwKpXFnW0AhAyr0AyXr0GM4mZ3ClWNIy601fMZCVC0ArAqPjCitfxFcg3v56s+F6AG6EwywvyVTIebhYJisF3zr0VBls0bnZcW/lYRpgVzXq78Lsv0vD4sFQ8/kUaArvFSz/gWgTA7b4vjMkWzptKqTtPShUeVFkAyjQAX0uLayk/VxfE62ItfbTsvDFiJ4LViadWw/Bs7GqBfevxsoFmVfz4F4oqdj9OxOSKqu2wFtQuSuLjaKktlPWA1ywAoTLHcOj0+bJj9584hwY9nKJVTCsAsQXH0H5aPj6Zs6kCgucV4O0pefBj8+lpEyD9toJre1XstVCk/S4yxR+mSA91DCnx9/r95fb/+NmLuJMXb6jqP9wqZjg3fExJOSAcOXdwJNDmu+yyuv41C0AV9z565gLu4Ht3iK4kAFejwyXn5fpDTzqAnMGV7wp+RcvG/43C4tqLXjJPOITMBFNFB/DYmQto3sdVLgDKTD1z4XKFQXeniCVbpbN4vQIQbkVGYUnZsTcqAEdPn0dtTwsAa2pD3CQt+24OGaxLPWIKlNg7edfJssH8+eJlPDgoWXb58DGhFtTv6RSZwCtR1wWby+zx9QiA3mzHlsNny45lE1D/CiaAs5DjE/ZhYsqBCpiUegBD43bDn/sBtRnFaoFVUf32naKqWy0UkXgHmeL3iTdQVrcQBMdiRnpRhcH+7+T15Uwz2ESz5Qujs/DqDzn426gsdJyzSUQAKt2QAITE4cHBKULgVOLNI4TmuZoTWCn887ATyDF/REKpeP9jtZLB9qqICqr7DWNBMWg/e2OFweYGUcE09xnFuQDGe6vxxo8Vw8brFgC+7sfR+Mqyu8KxIzn3wMf6chgoY/5BWnZVDxmtA2R3STX6A6EWNOrpxKFT5d44U8e5BdLDZ6arJeFP1qKu2Y51+05VOPZqAvARZwrfcwvfOLxUdg85z0UFN+ICEIXI6p7vCQAnfESxJ0rLpuolo3WJ9Ae0D3QTERSDsEVbKgw4s4Zn5JPDUtG0twu/6ZeIf49bh9Td5U6bSlcTgHmZBxE6ZxOMi7bAsHAz+q7cjrWaBBATm6EyVe5zAmBVXv3i2EohcU21LKpeMjrrk8merawzr+LhbgJYJYfEYVbGwQqDzsQWmquDJ3++qP1XGV1NAK6F0vaUoFF33m9IiTx8SgCsMtyLcJ0kQ8xTWvZ4hviNo2bnHmW3iSoe8iYg1AJdmAVj4gsrDHxVlLTrJLqtKK8c8pZwIgzsGIPP1l57OZiFa3rKATTs7pB5BHWxaFAs3puaX+HYcQn75D20z12tsMpUb0TCJTLGva5li2cpLOppinAdpW4cglSTEChdOG1GZQnVve/EuQrefuHxnzHGUYj6EXbRIZS+pwS5+07jHV7jx+q7U6zIzvFnWXtKKqPwFNJ3lyB6YzG+jN2NP3BjCZ+nZhLV5+gch5e+zxG+RlahvEc3XmbuSW+fwR0+vMInLK6jlh3eIa4XmF0l1R4eKh4/7+fzxJdpYvkWO2icDxBhFzuFnHYVK3k052oXa2jB56griUQvQRX3v9K1tP+vTvDLn3kFV1icWcsG75Ih5mWKZCGoRk3A4AFnRjOTWCD4p3v3D0PJ5lVgjsrkq+FamKm9zrWcc7PAM1+++Lmbdvh9g0KjX6II1zG5xrAaheBXB8Xmy4WdPjbztRS69o8U4dxbs8TsZqHM279EBl+x+b9EXWMepghXrswTVGOy6LaHEudHuI5TWMy/tcPs2xSyuCmZHauFEPjaziO3BOwyw2dybCZj9DPa4b11yGQfIaID0UtQ4xf8MqyyzsLMNztXUeiaa1zM4ctktralCNdhmTWsMQlXBUdREa5SMsd7qLDjKWK/wOyKFatUxCaFNdqgAriTR5hL15ab383jS2Sydyez85TQBp7oLroVwGGzbLydQEErG2uH7PajsJjHyexcTT1S1W3Lf51gTci2PsK1now2L+f0vUHG+A/I7NokBsGX31t0s8FOHptCs+MYmR19rrxly6+BOljqkTm+N5njDwobeDvvTlLGeNfPZHL+SMbo+7XD8eulcMudZHIOIbOjSAySaG2+TXwEVdWbHD9RhHMaRTqf0H79GlKpU8wdZHb2JrNjC3VPUzteKg+qr4O9eg7phLMbf4TMju/I7HxM+3Vr6ErUY3Ed4SOYHLFkjr8gtUKKHFjtYPsK1H341FDX7MgUUY8xWtmWvYZujCLsj5PROZBMjmwhADyrOHQSncleNhOsnTiSYaaLUM6+k0zxY8lsf1H7NWroZpCBN7FyDCCT3UVG+ykhCKpAcL28OjWEeNOGU2F4hrLrtu0imey5ZIwfTZGOV6hHah3tI9dQdVGo7T4y2d4jg30MGW2JZIw/JGYk+w0qg9gO88xk4bgecDTCjHa/Fqt1g62EjLYcMtqmkSG+k9hqv4Z8hHi/Y5Pzj2S0fkJG25dktC0koy2FjNadZLAeFW/KvHbsFe/V41er8ebKJluoeMeOyXqP9ra3Mv0/k8YJXiwPMS4AAAAASUVORK5CYII=\";\n  logo.alt = 'Governo do Distrito Federal';\n  logo.width = 56; logo.height = 56;\n  brand.appendChild(logo);\n  const h = el('div');\n  h.appendChild(el('p', 'sm-org', 'SEMOB-DF'));\n  h.appendChild(el('h1', '', 'Frota em circulação'));\n  h.appendChild(el('p', '', gps\n    ? `${fmt(rows.length)} veículos na base da SEMOB · ${fmt(live.length)} com sinal nos últimos ${age(janela)}`\n    : 'Sem dados de posição. Verifique a consulta A (Infinity) no inspetor de consultas.'));\n  brand.appendChild(h);\n  head.appendChild(brand);\n  const stamp = el('div', 'sm-stamp');\n  stamp.appendChild(icon('clock'));\n  stamp.appendChild(el('span', '', 'Atualizado às ' + new Date().toLocaleTimeString('pt-BR')));\n  head.appendChild(stamp);\n  app.appendChild(head);\n\n  /* ---------------------------------------------- séries numéricas do Zabbix */\n  const zbx = [];\n  series.forEach((fr) => {\n    (fr.fields || []).forEach((f) => {\n      if (f.type !== 'number') return;\n      const nm = (f.config && (f.config.displayNameFromDS || f.config.displayName)) || fr.name || f.name;\n      const v = vals(f).filter((x) => typeof x === 'number');\n      if (nm && v.length) zbx.push({ name: String(nm), v, last: v[v.length - 1] });\n    });\n  });\n  const zall = (re) => zbx.filter((s) => re.test(s.name));\n  const zone = (re) => zall(re)[0] || null;\n  const zlast = (re) => { const s = zone(re); return s ? s.last : NaN; };\n  const zser = (re) => { const s = zone(re); return s ? s.v : []; };\n\n  /* problemas ativos (frame com um campo de objetos) */\n  let problems = [];\n  series.forEach((fr) => (fr.fields || []).forEach((f) => {\n    if (f.type === 'other' || (f.config && f.config.custom && f.config.custom.type === 'problems')) {\n      vals(f).forEach((p) => { if (p && typeof p === 'object' && (p.name || p.description)) problems.push(p); });\n    }\n  }));\n  const sparkline = (arr, color) => {\n    if (arr.length < 2) return null;\n    const w = 150, hh = 30, mn = Math.min(...arr), mx = Math.max(...arr), r = mx - mn || 1;\n    const pt = arr.map((v, i) => [(i * w) / (arr.length - 1), hh - ((v - mn) / r) * (hh - 5) - 2]);\n    const s = svg('svg', { viewBox: `0 0 ${w} ${hh}`, class: 'sm-spark', preserveAspectRatio: 'none' });\n    svg('polygon', { points: `0,${hh} ${pt.map((p) => p.join(',')).join(' ')} ${w},${hh}`, fill: color, 'fill-opacity': .12 }, s);\n    svg('polyline', { points: pt.map((p) => p.join(',')).join(' '), fill: 'none', stroke: color, 'stroke-width': 1.8 }, s);\n    return s;\n  };\n  const kpis = el('div', 'sm-kpis');\n  app.appendChild(kpis);\n  const kpi = (ic, label, value, hint, color, arr) => {\n    const k = el('article', 'sm-kpi');\n    k.style.setProperty('--a', color);\n    const top = el('div', 'sm-kpi-top');\n    top.appendChild(icon(ic));\n    top.appendChild(el('span', '', label));\n    k.appendChild(top);\n    k.appendChild(el('strong', '', value));\n    k.appendChild(el('span', 'sm-kpi-h', hint));\n    const sp = arr && sparkline(arr, color);\n    if (sp) k.appendChild(sp);\n    kpis.appendChild(k);\n  };\n  kpi('pin', 'Veículos com sinal', fmt(live.length), `${fmt(pct(live.length, rows.length), 1)}% da base`, '#1F6FD1', zser(/veículos com registro recente$/));\n  kpi('bus', 'Em movimento', fmt(mov.length), `${fmt(live.length - mov.length)} parados`, '#2E9E44', zser(/recentes em movimento$/));\n  kpi('speed', 'Velocidade média', `${fmt(mean(speeds), 1)} km/h`, `mediana ${fmt(quant(speeds, .5), 1)} · p90 ${fmt(quant(speeds, .9), 1)}`, '#FF7F11');\n  kpi('route', 'Linhas em operação', fmt(linhas.length), `${fmt(semLinha)} veículos sem linha`, '#6B47B8');\n  kpi('signal', 'Atraso do sinal', age(quant(live.map((r) => r.idade), .5)), `p90 ${age(quant(live.map((r) => r.idade), .9))}`, '#0E7C7B', zser(/idade do registro mais recente$/));\n  kpi('alert', 'Sem transmitir 24 h', fmt(mudos), `${fmt(pct(mudos, rows.length), 1)}% da base`, '#D62828');\n\n  /* abas */\n  const TABS = [['mapa', 'Mapa da frota', 'pin'], ['empresas', 'Empresas', 'bus'], ['linhas', 'Linhas', 'route'],\n    ['qualidade', 'Qualidade e disponibilidade', 'signal'], ['cadastros', 'Cadastros', 'grid'],\n    ['problemas', 'Problemas' + (problems.length ? ' (' + problems.length + ')' : ''), 'alert']];\n  const tabbar = el('div', 'sm-tabs');\n  tabbar.setAttribute('role', 'tablist');\n  app.appendChild(tabbar);\n  const panes = {};\n  const btns = {};\n  const stage = el('div', 'sm-stage');\n  app.appendChild(stage);\n  let active = window.__smTab && TABS.some((t) => t[0] === window.__smTab) ? window.__smTab : 'mapa';\n  const show = (id) => {\n    active = window.__smTab = id;\n    TABS.forEach(([k]) => {\n      btns[k].classList.toggle('on', k === id);\n      btns[k].setAttribute('aria-selected', k === id ? 'true' : 'false');\n      btns[k].tabIndex = k === id ? 0 : -1;\n      panes[k].hidden = k !== id;\n    });\n    if (id === 'mapa' && window.__smMap) setTimeout(() => window.__smMap.invalidateSize(), 30);\n  };\n  TABS.forEach(([k, label, ic]) => {\n    const b = el('button', 'sm-tab');\n    b.type = 'button';\n    b.setAttribute('role', 'tab');\n    b.appendChild(icon(ic));\n    b.appendChild(el('span', '', label));\n    b.onclick = () => show(k);\n    b.onkeydown = (e) => {\n      const i = TABS.findIndex(([x]) => x === active);\n      if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {\n        const n = TABS[(i + (e.key === 'ArrowRight' ? 1 : TABS.length - 1)) % TABS.length][0];\n        show(n); btns[n].focus(); e.preventDefault();\n      }\n    };\n    btns[k] = b;\n    tabbar.appendChild(b);\n    const pane = el('section', 'sm-pane');\n    pane.setAttribute('role', 'tabpanel');\n    panes[k] = pane;\n    stage.appendChild(pane);\n  });\n\n  /* ----------------------------------------------------------- aba 1: o mapa */\n  const mapPane = panes.mapa;\n  const mapWrap = el('div', 'sm-mapwrap');\n  mapPane.appendChild(mapWrap);\n  const mapBox = el('div', 'sm-map');\n  mapWrap.appendChild(mapBox);\n  const aside = el('aside', 'sm-aside');\n  mapWrap.appendChild(aside);\n\n  const searchRow = el('div', 'sm-search');\n  searchRow.appendChild(icon('route'));\n  const input = el('input');\n  input.type = 'search';\n  input.placeholder = 'Linha ou prefixo do veículo';\n  input.setAttribute('aria-label', 'Buscar linha ou prefixo do veículo');\n  searchRow.appendChild(input);\n  aside.appendChild(searchRow);\n  const searchMsg = el('p', 'sm-msg');\n  aside.appendChild(searchMsg);\n\n  /* busca ligada no primeiro render: funciona mesmo antes de o mapa carregar */\n  const matches = (q) => live.filter((r) => r.linha.toLowerCase().indexOf(q) === 0 || r.prefixo.toLowerCase() === q);\n  let onSearch = null;\n  input.addEventListener('input', () => {\n    const q = input.value.trim().toLowerCase();\n    const hit = q ? matches(q) : [];\n    const ls = [...new Set(hit.map((r) => r.linha).filter(Boolean))].sort();\n    searchMsg.textContent = q\n      ? (hit.length\n        ? `${hit.length} veículo${hit.length > 1 ? 's' : ''}`\n          + (ls.length === 1 ? ` na linha ${ls[0]}` : ls.length > 1 ? ` em ${ls.length} linhas: ${ls.slice(0, 4).join(', ')}${ls.length > 4 ? ' e outras ' + (ls.length - 4) : ''}` : '')\n          + '. Só eles aparecem no mapa até limpar a busca.'\n        : 'Nada encontrado com sinal recente')\n      : '';\n    searchRow.classList.toggle('on', !!q);\n    if (onSearch) onSearch(hit);\n  });\n\n  const legend = el('div', 'sm-legend');\n  const legendHead = el('div', 'sm-legend-h');\n  legendHead.appendChild(el('h2', '', 'Empresas no mapa'));\n  legendHead.appendChild(el('p', 'sm-hint', 'Clique para mostrar ou ocultar. Duplo clique enquadra.'));\n  legend.appendChild(legendHead);\n  const legendList = el('div', 'sm-legend-list');\n  legend.appendChild(legendList);\n  aside.appendChild(legend);\n  const hidden = window.__smHidden || (window.__smHidden = {});\n  const maxN = Math.max(1, ...empresas.map((e) => e.n));\n  const cards = {};\n  empresas.forEach((e) => {\n    const c = el('button', 'sm-emp' + (hidden[e.key] ? ' off' : ''));\n    c.type = 'button';\n    c.style.setProperty('--a', e.color);\n    c.title = e.full;\n    const t = el('div', 'sm-emp-t');\n    t.appendChild(el('i', 'sm-chip'));\n    t.appendChild(el('span', 'sm-emp-n', e.name));\n    if (e.bacia) t.appendChild(el('span', 'sm-bacia', 'Bacia ' + e.bacia));\n    t.appendChild(el('b', 'sm-emp-v', fmt(e.n)));\n    c.appendChild(t);\n    const bar = el('div', 'sm-track');\n    const f1 = el('i', 'sm-fill');\n    f1.style.width = pct(e.n, maxN) + '%';\n    const f2 = el('i', 'sm-fill-m');\n    f2.style.width = pct(e.mov, maxN) + '%';\n    bar.appendChild(f1); bar.appendChild(f2);\n    c.appendChild(bar);\n    const st = el('div', 'sm-emp-s');\n    [[fmt(pct(e.mov, e.n), 0) + '%', 'rodando'], [fmt(mean(e.sp), 0) + ' km/h', 'média'],\n     [fmt(Object.keys(e.linhas).length), 'linhas'], [age(quant(e.idades, .5)), 'sinal']].forEach(([v, l]) => {\n      const d = el('div');\n      d.appendChild(el('b', '', v));\n      d.appendChild(el('span', '', l));\n      st.appendChild(d);\n    });\n    c.appendChild(st);\n    cards[e.key] = c;\n    legendList.appendChild(c);\n  });\n\n  /* ------------------------------------------------------- aba 2: empresas */\n  const empPane = panes.empresas;\n  const empGrid = el('div', 'sm-grid2');\n  empPane.appendChild(empGrid);\n\n  const card = (host, title, sub) => {\n    const c = el('section', 'sm-card');\n    const hd = el('header');\n    hd.appendChild(el('h2', '', title));\n    if (sub) hd.appendChild(el('p', '', sub));\n    c.appendChild(hd);\n    host.appendChild(c);\n    return c;\n  };\n\n  /* rosca: participação de cada empresa nos veículos em circulação */\n  (() => {\n    const c = card(empGrid, 'Participação na frota em circulação', 'Veículos com sinal recente, por empresa');\n    const wrap = el('div', 'sm-donut-wrap');\n    c.appendChild(wrap);\n    const S = 240, cx = S / 2, cy = S / 2, R = 104, r0 = 64;\n    const s = svg('svg', { viewBox: `0 0 ${S} ${S}`, class: 'sm-donut' });\n    const total = live.length || 1;\n    let a0 = -Math.PI / 2;\n    const center = svg('g', {}, s);\n    const big = svgText(center, cx, cy - 2, fmt(live.length), 'd-big');\n    const small = svgText(center, cx, cy + 18, 'veículos', 'd-small');\n    empresas.forEach((e) => {\n      const ang = (e.n / total) * Math.PI * 2, a1 = a0 + ang;\n      const p = (rr, a) => [cx + rr * Math.cos(a), cy + rr * Math.sin(a)];\n      const [x1, y1] = p(R, a0), [x2, y2] = p(R, a1), [x3, y3] = p(r0, a1), [x4, y4] = p(r0, a0);\n      const path = svg('path', {\n        d: `M${x1},${y1}A${R},${R} 0 ${ang > Math.PI ? 1 : 0} 1 ${x2},${y2}L${x3},${y3}A${r0},${r0} 0 ${ang > Math.PI ? 1 : 0} 0 ${x4},${y4}Z`,\n        fill: e.color, class: 'd-arc',\n      }, s);\n      path.addEventListener('mouseenter', () => { big.textContent = fmt(e.n); small.textContent = e.name; });\n      path.addEventListener('mouseleave', () => { big.textContent = fmt(live.length); small.textContent = 'veículos'; });\n      svg('title', {}, path).textContent = `${e.full}: ${fmt(e.n)} veículos (${fmt(pct(e.n, total), 1)}%)`;\n      a0 = a1;\n    });\n    s.appendChild(center);\n    wrap.appendChild(s);\n    const lg = el('ul', 'sm-dlg');\n    empresas.forEach((e) => {\n      const li = el('li');\n      const i = el('i');\n      i.style.background = e.color;\n      li.appendChild(i);\n      li.appendChild(el('span', 'n', e.name));\n      li.appendChild(el('b', '', fmt(pct(e.n, total), 1) + '%'));\n      lg.appendChild(li);\n    });\n    wrap.appendChild(lg);\n  })();\n\n  /* radar: perfil operacional comparado, normalizado de 0 a 100 */\n  (() => {\n    const c = card(empGrid, 'Perfil operacional comparado', 'Cada eixo normalizado pelo melhor valor entre as empresas');\n    const AX = [\n      ['Frota ativa', (e) => e.n],\n      ['Em movimento', (e) => pct(e.mov, e.n)],\n      ['Velocidade', (e) => mean(e.sp) || 0],\n      ['Cobertura de linhas', (e) => Object.keys(e.linhas).length],\n      ['Sinal recente', (e) => 100 - pct(quant(e.idades, .5), janela)],\n      ['Linha informada', (e) => 100 - pct(e.semLinha, e.n)],\n    ];\n    const show3 = empresas.filter((e) => e.key !== OTHERS).slice(0, 5);\n    const S = 300, cx = S / 2, cy = S / 2 + 6, R = 104;\n    const s = svg('svg', { viewBox: `0 0 ${S} ${S}`, class: 'sm-radar' });\n    const maxv = AX.map(([, f]) => Math.max(...show3.map((e) => f(e) || 0), 1));\n    [.25, .5, .75, 1].forEach((k) => {\n      svg('polygon', {\n        points: AX.map((_, i) => {\n          const a = (i / AX.length) * Math.PI * 2 - Math.PI / 2;\n          return `${cx + R * k * Math.cos(a)},${cy + R * k * Math.sin(a)}`;\n        }).join(' '), class: 'r-grid',\n      }, s);\n    });\n    AX.forEach(([label], i) => {\n      const a = (i / AX.length) * Math.PI * 2 - Math.PI / 2;\n      svg('line', { x1: cx, y1: cy, x2: cx + R * Math.cos(a), y2: cy + R * Math.sin(a), class: 'r-grid' }, s);\n      const lx = cx + (R + 24) * Math.cos(a), ly = cy + (R + 24) * Math.sin(a);\n      svgText(s, lx, ly + 4, label, 'r-lab', Math.abs(Math.cos(a)) < .3 ? 'middle' : (Math.cos(a) > 0 ? 'start' : 'end'));\n    });\n    show3.forEach((e) => {\n      const pts = AX.map(([, f], i) => {\n        const a = (i / AX.length) * Math.PI * 2 - Math.PI / 2, k = Math.max(0, Math.min(1, (f(e) || 0) / maxv[i]));\n        return `${cx + R * k * Math.cos(a)},${cy + R * k * Math.sin(a)}`;\n      }).join(' ');\n      svg('polygon', { points: pts, fill: e.color, 'fill-opacity': .1, stroke: e.color, 'stroke-width': 2, class: 'r-area' }, s);\n    });\n    c.appendChild(s);\n    const lg = el('ul', 'sm-rlg');\n    show3.forEach((e) => {\n      const li = el('li');\n      const i = el('i');\n      i.style.background = e.color;\n      li.appendChild(i);\n      li.appendChild(el('span', '', e.name));\n      lg.appendChild(li);\n    });\n    c.appendChild(lg);\n  })();\n\n  /* tabela operacional por empresa */\n  (() => {\n    const c = card(empPane, 'Quadro operacional por empresa', 'Ordenado por veículos em circulação. Clique no cabeçalho para reordenar.');\n    c.classList.add('sm-wide');\n    const COLS = [\n      ['Empresa', (e) => e, 'emp'], ['Bacia', (e) => e.bacia || '–', 'c'], ['No mapa', (e) => e.n, 'n'],\n      ['Rodando', (e) => e.mov, 'n'], ['% rodando', (e) => pct(e.mov, e.n), 'n1'], ['Km/h médio', (e) => mean(e.sp) || 0, 'n1'],\n      ['Km/h p90', (e) => quant(e.sp, .9) || 0, 'n1'], ['Linhas', (e) => Object.keys(e.linhas).length, 'n'],\n      ['Sem linha', (e) => e.semLinha, 'n'], ['Sinal mediano', (e) => quant(e.idades, .5), 'age'],\n    ];\n    const tb = el('table', 'sm-table');\n    const thead = el('thead');\n    const trh = el('tr');\n    COLS.forEach(([name, , kind], i) => {\n      const th = el('th', kind === 'emp' || kind === 'c' ? '' : 'num');\n      const b = el('button', '', name);\n      b.type = 'button';\n      b.onclick = () => sort(i);\n      th.appendChild(b);\n      trh.appendChild(th);\n    });\n    thead.appendChild(trh);\n    tb.appendChild(thead);\n    const tbody = el('tbody');\n    tb.appendChild(tbody);\n    c.appendChild(tb);\n    let sortIdx = 2, desc = true;\n    const render = () => {\n      tbody.innerHTML = '';\n      const data = empresas.slice().sort((a, b) => {\n        const va = COLS[sortIdx][1](a), vb = COLS[sortIdx][1](b);\n        const x = typeof va === 'object' ? va.name.localeCompare(vb.name) : (num(va) - num(vb) || 0);\n        return desc ? -x : x;\n      });\n      data.forEach((e) => {\n        const tr = el('tr');\n        COLS.forEach(([, f, kind]) => {\n          const v = f(e);\n          const td = el('td', kind === 'emp' || kind === 'c' ? '' : 'num');\n          if (kind === 'emp') {\n            const i = el('i', 'sm-chip');\n            i.style.setProperty('--a', e.color);\n            td.appendChild(i);\n            td.appendChild(el('span', '', e.name));\n            td.title = e.full;\n          } else td.textContent = kind === 'age' ? age(v) : (kind === 'n1' ? fmt(v, 1) : (typeof v === 'number' ? fmt(v) : v));\n          tr.appendChild(td);\n        });\n        tbody.appendChild(tr);\n      });\n      [...thead.querySelectorAll('th')].forEach((th, i) => th.setAttribute('aria-sort', i === sortIdx ? (desc ? 'descending' : 'ascending') : 'none'));\n    };\n    const sort = (i) => { desc = i === sortIdx ? !desc : true; sortIdx = i; render(); };\n    render();\n  })();\n\n  /* ---------------------------------------------------------- aba 3: linhas */\n  (() => {\n    const pane = panes.linhas;\n    const grid = el('div', 'sm-grid2');\n    pane.appendChild(grid);\n    /* barras: linhas com mais veículos */\n    const c1 = card(grid, 'Linhas com mais veículos', 'Top 14 entre os veículos com sinal recente');\n    const list = el('div', 'sm-bars');\n    const top = linhas.slice(0, 14);\n    const mx = Math.max(1, ...top.map((l) => l.n));\n    top.forEach((l) => {\n      const dom = Object.keys(l.ops).sort((a, b) => l.ops[b] - l.ops[a])[0];\n      const g = G[dom] || { color: C_OTHERS, name: OTHERS };\n      const b = el('button', 'sm-barrow');\n      b.type = 'button';\n      b.title = `${l.n} veículos · ${l.mov} rodando · ${g.name}`;\n      b.appendChild(el('span', 'k', l.k));\n      const tr = el('span', 'tr');\n      const f = el('i');\n      f.style.width = pct(l.n, mx) + '%';\n      f.style.background = g.color;\n      tr.appendChild(f);\n      b.appendChild(tr);\n      b.appendChild(el('span', 'v', fmt(l.n)));\n      b.onclick = () => { show('mapa'); input.value = l.k; input.dispatchEvent(new Event('input')); };\n      list.appendChild(b);\n    });\n    c1.appendChild(list);\n\n    /* dispersão: veículos x velocidade média da linha */\n    const c2 = card(grid, 'Velocidade por tamanho da linha', 'Cada ponto é uma linha. Cor da empresa com mais veículos nela.');\n    const W = 320, H = 240, pad = 38;\n    const s = svg('viewBox' in {} ? 'svg' : 'svg', { viewBox: `0 0 ${W} ${H}`, class: 'sm-scatter' });\n    const pts = linhas.filter((l) => l.sp.length);\n    const mxn = Math.max(1, ...pts.map((l) => l.n)), mxv = Math.max(10, ...pts.map((l) => mean(l.sp)));\n    [0, .25, .5, .75, 1].forEach((k) => {\n      const y = H - pad - k * (H - pad - 14);\n      svg('line', { x1: pad, y1: y, x2: W - 6, y2: y, class: 'r-grid' }, s);\n      svgText(s, pad - 6, y + 3, fmt(mxv * k, 0), 'v-lab', 'end');\n    });\n    pts.forEach((l) => {\n      const dom = Object.keys(l.ops).sort((a, b) => l.ops[b] - l.ops[a])[0];\n      const g = G[dom] || { color: C_OTHERS, name: OTHERS };\n      const cxp = pad + (l.n / mxn) * (W - pad - 10), cyp = H - pad - (mean(l.sp) / mxv) * (H - pad - 14);\n      const cc = svg('circle', { cx: cxp, cy: cyp, r: 4, fill: g.color, 'fill-opacity': .65, class: 'sc-dot' }, s);\n      svg('title', {}, cc).textContent = `Linha ${l.k}: ${l.n} veículos, ${fmt(mean(l.sp), 1)} km/h · ${g.name}`;\n    });\n    svgText(s, (W + pad) / 2, H - 6, 'veículos na linha', 'v-lab');\n    svgText(s, pad + 4, 9, 'km/h', 'v-lab', 'start');\n    c2.appendChild(s);\n\n    /* tabela de linhas */\n    const c3 = card(pane, 'Linhas em operação', `${fmt(linhas.length)} linhas com veículo transmitindo. Clique numa linha para vê-la no mapa.`);\n    c3.classList.add('sm-wide');\n    const tb = el('table', 'sm-table');\n    const thr = el('tr');\n    ['Linha', 'Empresa predominante', 'Veículos', 'Rodando', 'Km/h médio', 'Sinal mediano'].forEach((n, i) => {\n      const th = el('th', i >= 2 ? 'num' : '', n);\n      thr.appendChild(th);\n    });\n    const thead = el('thead');\n    thead.appendChild(thr);\n    tb.appendChild(thead);\n    const tbody = el('tbody');\n    linhas.slice(0, 60).forEach((l) => {\n      const dom = Object.keys(l.ops).sort((a, b) => l.ops[b] - l.ops[a])[0];\n      const g = G[dom] || { color: C_OTHERS, name: OTHERS, full: OTHERS };\n      const tr = el('tr', 'click');\n      tr.tabIndex = 0;\n      const open = () => { show('mapa'); input.value = l.k; input.dispatchEvent(new Event('input')); };\n      tr.onclick = open;\n      tr.onkeydown = (ev) => { if (ev.key === 'Enter') open(); };\n      const td0 = el('td');\n      td0.appendChild(el('b', '', l.k));\n      tr.appendChild(td0);\n      const td1 = el('td');\n      const chip = el('i', 'sm-chip');\n      chip.style.setProperty('--a', g.color);\n      td1.appendChild(chip);\n      td1.appendChild(el('span', '', g.name));\n      td1.title = g.full;\n      tr.appendChild(td1);\n      [fmt(l.n), fmt(l.mov), fmt(mean(l.sp) || 0, 1), age(quant(l.idades, .5))].forEach((v) => tr.appendChild(el('td', 'num', v)));\n      tbody.appendChild(tr);\n    });\n    tb.appendChild(tbody);\n    c3.appendChild(tb);\n    if (linhas.length > 60) c3.appendChild(el('p', 'sm-hint', `Mostrando as 60 linhas com mais veículos de ${fmt(linhas.length)}.`));\n  })();\n\n  /* ------------------------------------------------------- aba 4: qualidade */\n  (() => {\n    const pane = panes.qualidade;\n    const grid = el('div', 'sm-grid3');\n    pane.appendChild(grid);\n    const bars = (host, items) => {\n      const W = 320, H = 180, pad = 26, bw = (W - 12) / items.length;\n      const s = svg('svg', { viewBox: `0 0 ${W} ${H}`, class: 'sm-cols' });\n      const mx = Math.max(1, ...items.map((i) => i.v));\n      items.forEach((it, i) => {\n        const hh = ((H - pad - 20) * it.v) / mx, x = 6 + i * bw;\n        const r = svg('rect', { x: x + 4, y: H - pad - hh, width: bw - 8, height: Math.max(hh, 1), rx: 4, fill: it.color }, s);\n        svg('title', {}, r).textContent = `${it.l}: ${fmt(it.v)}`;\n        svgText(s, x + bw / 2, H - pad - hh - 5, fmt(it.v), 'v-val');\n        svgText(s, x + bw / 2, H - 8, it.l, 'v-lab');\n      });\n      host.appendChild(s);\n    };\n    const faixas = [[0, 0, 'parado', '#B9C2BD'], [0, 10, '1–10', '#8FD0A8'], [10, 20, '10–20', '#5BBF83'],\n      [20, 30, '20–30', '#2E9E44'], [30, 40, '30–40', '#F2C200'], [40, 60, '40–60', '#FF7F11'], [60, 1e9, '60+', '#D62828']];\n    bars(card(grid, 'Velocidade instantânea', 'Veículos com sinal recente, em km/h'),\n      faixas.map(([a, b, l, color], i) => ({ l, color, v: live.filter((r) => (i === 0 ? !(r.vel > 0) : r.vel > a && r.vel <= b)).length })));\n\n    const idades = [[-1e9, 60, '≤1 min', '#2E9E44'], [60, 300, '1–5 min', '#5BBF83'], [300, 900, '5–15 min', '#F2C200'],\n      [900, 3600, '15–60 min', '#FF7F11'], [3600, 86400, '1–24 h', '#D62828'], [86400, 1e12, '>24 h', '#7A1F1F']];\n    bars(card(grid, 'Idade do último sinal', 'Toda a base de veículos, não só os recentes'),\n      idades.map(([a, b, l, color]) => ({ l, color, v: rows.filter((r) => r.idade > a && r.idade <= b).length })));\n\n    /* rosa dos ventos */\n    (() => {\n      const c = card(grid, 'Rumo dos veículos', 'Campo direcao, em graus a partir do norte');\n      const sect = new Array(8).fill(0);\n      mov.forEach((r) => { if (r.dir >= 0 && r.dir <= 360) sect[Math.round(r.dir / 45) % 8]++; });\n      const S = 210, cx = S / 2, cy = S / 2, R = 76, mx = Math.max(1, ...sect);\n      const s = svg('svg', { viewBox: `0 0 ${S} ${S}`, class: 'sm-rose' });\n      [.33, .66, 1].forEach((k) => svg('circle', { cx, cy, r: R * k, class: 'r-grid' }, s));\n      sect.forEach((v, i) => {\n        const a0 = ((i * 45 - 19) - 90) * Math.PI / 180, a1 = ((i * 45 + 19) - 90) * Math.PI / 180, rr = 8 + (R - 8) * v / mx;\n        const p = svg('path', {\n          d: `M${cx},${cy} L${cx + rr * Math.cos(a0)},${cy + rr * Math.sin(a0)} A${rr},${rr} 0 0 1 ${cx + rr * Math.cos(a1)},${cy + rr * Math.sin(a1)} Z`,\n          fill: '#1F6FD1', 'fill-opacity': .25 + .6 * v / mx, stroke: '#1F6FD1',\n        }, s);\n        svg('title', {}, p).textContent = `${ROSE[i]}: ${fmt(v)} veículos`;\n        const am = (i * 45 - 90) * Math.PI / 180;\n        svgText(s, cx + (R + 14) * Math.cos(am), cy + (R + 14) * Math.sin(am) + 4, ROSE[i], 'v-lab');\n      });\n      c.appendChild(s);\n    })();\n\n    /* tempo de resposta do GeoServer, do cenário web do Zabbix */\n    (() => {\n      const etapas = [['WFS GetCapabilities', '#1F6FD1'], ['WFS GetFeature', '#2E9E44'], ['WMS GetCapabilities', '#FF7F11']];\n      const sers = etapas.map(([n, color]) => ({ n, color, s: zone(new RegExp('Response time for step \"' + n + '\"')) })).filter((x) => x.s);\n      if (!sers.length) return;\n      const c = card(grid, 'Resposta do GeoServer', 'Tempo de cada etapa do cenário web, em segundos');\n      const W = 320, H = 180, pl = 36, pb = 22;\n      const g = svg('svg', { viewBox: `0 0 ${W} ${H}`, class: 'sm-lines' });\n      const mx = Math.max(...sers.map((x) => Math.max(...x.s.v))) || 1;\n      [0, .5, 1].forEach((k) => {\n        const y = H - pb - k * (H - pb - 12);\n        svg('line', { x1: pl, y1: y, x2: W - 6, y2: y, class: 'r-grid' }, g);\n        svgText(g, pl - 6, y + 3, fmt(mx * k * 1000, 0) + ' ms', 'v-lab', 'end');\n      });\n      sers.forEach((x) => {\n        const n = x.s.v.length;\n        const pts = x.s.v.map((v, i) => `${pl + (i / Math.max(n - 1, 1)) * (W - pl - 6)},${H - pb - (v / mx) * (H - pb - 12)}`).join(' ');\n        svg('polyline', { points: pts, fill: 'none', stroke: x.color, 'stroke-width': 1.8 }, g);\n      });\n      c.appendChild(g);\n      const lg = el('ul', 'sm-rlg');\n      sers.forEach((x) => {\n        const li = el('li');\n        const i = el('i');\n        i.style.background = x.color;\n        li.appendChild(i);\n        li.appendChild(el('span', '', `${x.n} · ${fmt(x.s.last * 1000, 0)} ms`));\n        lg.appendChild(li);\n      });\n      c.appendChild(lg);\n    })();\n\n    /* consistência do cadastro */\n    const c = card(pane, 'Consistência do que a SEMOB publica', 'Contagens do último ciclo de coleta');\n    c.classList.add('sm-wide');\n    const ITEMS = [\n      ['Veículos na base', rows.length, 'Registros da camada semob:ultima_posicao', 'ok'],\n      ['Com sinal recente', live.length, `dataregistro de até ${age(janela)}`, live.length ? 'ok' : 'bad'],\n      ['Sem transmitir há mais de 24 h', mudos, 'Prováveis veículos fora de operação', mudos > rows.length * .2 ? 'warn' : 'ok'],\n      ['Sem coordenada utilizável', semCoord, 'Latitude e longitude nulas, fora de faixa ou (0,0)', semCoord ? 'warn' : 'ok'],\n      ['Sem linha informada', semLinha, 'Campo cd_linha vazio entre os veículos com sinal', semLinha ? 'warn' : 'ok'],\n      ['Velocidade não numérica', live.filter((r) => isNaN(r.vel) && r.vel !== null).length, 'Valor preenchido que não converte para número', 'ok'],\n      ['Rumo fora de 0 a 360', mov.filter((r) => !(r.dir >= 0 && r.dir <= 360)).length, 'Campo direcao inválido entre os veículos em movimento', 'ok'],\n    ];\n    /* o Zabbix calcula os mesmos indicadores sobre a coleta dele, com histórico */\n    [['Coordenadas inválidas (Zabbix)', /^Posições: coordenadas inválidas$/, 'Mesma verificação feita na coleta do Zabbix'],\n     ['Duplicidades operadora e prefixo', /^Posições: duplicidades operadora e prefixo$/, 'Par id_operadora + prefixo repetido no mesmo ciclo'],\n     ['Datas inválidas ou futuras', /^Posições: datas inválidas ou futuras$/, 'dataregistro ausente, fora do padrão ISO 8601 ou no futuro'],\n     ['Velocidades não numéricas (Zabbix)', /^Posições: velocidades não numéricas$/, 'Valor de velocidade que não converte para número']\n    ].forEach(([name, re, desc]) => {\n      const v = zlast(re);\n      if (isFinite(v)) ITEMS.push([name, v, desc, v > 0 ? 'warn' : 'ok']);\n    });\n    const tb = el('table', 'sm-table');\n    const thead = el('thead');\n    const trh = el('tr');\n    ['Verificação', 'Registros', '% da base', 'O que significa', 'Situação'].forEach((n, i) => trh.appendChild(el('th', i === 1 || i === 2 ? 'num' : '', n)));\n    thead.appendChild(trh);\n    tb.appendChild(thead);\n    const tbody = el('tbody');\n    ITEMS.forEach(([name, v, desc, st]) => {\n      const tr = el('tr');\n      tr.appendChild(el('td', '', name));\n      tr.appendChild(el('td', 'num', fmt(v)));\n      tr.appendChild(el('td', 'num', fmt(pct(v, rows.length), 1) + '%'));\n      tr.appendChild(el('td', 'desc', desc));\n      const td = el('td');\n      td.appendChild(el('span', 'sm-tag ' + (st === 'ok' ? 'ok' : st === 'warn' ? 'warn' : 'bad'),\n        st === 'ok' ? 'Normal' : st === 'warn' ? 'Observar' : 'Sem dados'));\n      tr.appendChild(td);\n      tbody.appendChild(tr);\n    });\n    tb.appendChild(tbody);\n    c.appendChild(tb);\n  })();\n\n  /* ------------------------------------------------------- aba 5: cadastros */\n  (() => {\n    const pane = panes.cadastros;\n    const kpis2 = el('div', 'sm-kpis');\n    pane.appendChild(kpis2);\n    const mini = (ic, label, value, hint, color) => {\n      const k = el('article', 'sm-kpi');\n      k.style.setProperty('--a', color);\n      const t = el('div', 'sm-kpi-top');\n      t.appendChild(icon(ic));\n      t.appendChild(el('span', '', label));\n      k.appendChild(t);\n      k.appendChild(el('strong', '', value));\n      k.appendChild(el('span', 'sm-kpi-h', hint));\n      kpis2.appendChild(k);\n    };\n    const frotaTotal = zlast(/^Frota: veículos cadastrados$/);\n    const frotaOps = zlast(/^Frota: operadoras cadastradas$/);\n    const frotaIdade = zlast(/^Frota: idade média$/);\n    const frotaRef = zlast(/^Frota: idade da data de referência$/);\n    const camadas = zlast(/^WFS: camadas publicadas$/);\n    mini('bus', 'Frota cadastrada', fmt(frotaTotal), 'veículos no cadastro da SEMOB', '#1F6FD1');\n    mini('grid', 'Empresas no cadastro', fmt(frotaOps), 'inclui permissionários agrupados', '#6B47B8');\n    mini('clock', 'Idade média da frota', isFinite(frotaIdade) ? fmt(frotaIdade, 1) + ' anos' : '–', 'pelo ano de fabricação', '#FF7F11');\n    mini('signal', 'Cadastro atualizado há', age(frotaRef), 'maior data_referencia publicada', frotaRef > 259200 ? '#D62828' : '#2E9E44');\n    mini('pin', 'Camadas publicadas', fmt(camadas), 'FeatureType no catálogo WFS', '#0E7C7B');\n\n    const grid = el('div', 'sm-grid2');\n    pane.appendChild(grid);\n\n    /* frota cadastrada por empresa, com cor da empresa */\n    (() => {\n      const itens = zall(/^Frota \\[.*\\]: veículos cadastrados$/).map((x) => {\n        const nome = (/\\[(.*)\\]/.exec(x.name) || [, x.name])[1];\n        const cor = Object.keys(C).find((k) => nome.toUpperCase().indexOf(k) >= 0);\n        return { nome: /STPCR/i.test(nome) ? 'STPCR (permissionários)' : short(nome), full: nome, v: x.last, color: cor ? C[cor] : C_OTHERS };\n      }).sort((a, b) => b.v - a.v);\n      if (!itens.length) return;\n      const c = card(grid, 'Frota cadastrada por empresa', 'Veículos no cadastro, não necessariamente em circulação');\n      const list = el('div', 'sm-bars');\n      const mx = Math.max(1, ...itens.map((i) => i.v));\n      itens.forEach((i) => {\n        const r = el('div', 'sm-barrow');\n        r.title = i.full;\n        r.appendChild(el('span', 'k', i.nome));\n        const tr = el('span', 'tr');\n        const f = el('i');\n        f.style.width = pct(i.v, mx) + '%';\n        f.style.background = i.color;\n        tr.appendChild(f);\n        r.appendChild(tr);\n        r.appendChild(el('span', 'v', fmt(i.v)));\n        list.appendChild(r);\n      });\n      c.appendChild(list);\n      c.classList.add('sm-barlist-wide');\n    })();\n\n    /* frota cadastrada contra frota em circulação */\n    (() => {\n      const c = card(grid, 'Cadastro e circulação', 'Veículos cadastrados e veículos transmitindo agora, por empresa');\n      const tb = el('table', 'sm-table');\n      const thead = el('thead');\n      const trh = el('tr');\n      ['Empresa', 'Cadastrados', 'Com sinal', 'Em circulação'].forEach((n, i) => trh.appendChild(el('th', i ? 'num' : '', n)));\n      thead.appendChild(trh);\n      tb.appendChild(thead);\n      const tbody = el('tbody');\n      const cad = {};\n      zall(/^Frota \\[.*\\]: veículos cadastrados$/).forEach((x) => {\n        const nome = (/\\[(.*)\\]/.exec(x.name) || [, x.name])[1];\n        cad[/STPCR/i.test(nome) ? OTHERS : short(nome)] = x.last;\n      });\n      empresas.forEach((e) => {\n        const tr = el('tr');\n        const td0 = el('td');\n        const chip = el('i', 'sm-chip');\n        chip.style.setProperty('--a', e.color);\n        td0.appendChild(chip);\n        td0.appendChild(el('span', '', e.name));\n        td0.title = e.full;\n        tr.appendChild(td0);\n        const total = cad[e.name];\n        tr.appendChild(el('td', 'num', isFinite(total) ? fmt(total) : '–'));\n        tr.appendChild(el('td', 'num', fmt(e.n)));\n        tr.appendChild(el('td', 'num', isFinite(total) && total > 0 ? fmt(pct(e.n, total), 1) + '%' : '–'));\n        tbody.appendChild(tr);\n      });\n      tb.appendChild(tbody);\n      c.appendChild(tb);\n      c.appendChild(el('p', 'sm-hint', 'O cadastro é publicado uma vez por dia. A circulação acima de 100% indica veículo transmitindo fora do cadastro vigente.'));\n    })();\n\n    /* catálogo WFS */\n    (() => {\n      const itens = zall(/^Camada \\[.*\\]: registros$/).map((x) => ({\n        nome: (/\\[(?:semob:)?(.*)\\]/.exec(x.name) || [, x.name])[1], v: x.last,\n      })).sort((a, b) => b.v - a.v);\n      if (!itens.length) return;\n      const c = card(pane, 'Catálogo publicado pela SEMOB', 'Registros de cada camada do GeoServer. Escala logarítmica, porque as camadas variam de 15 a 50 mil registros.');\n      c.classList.add('sm-wide');\n      const list = el('div', 'sm-bars sm-bars-2');\n      const lg = (v) => Math.log10(Math.max(v, 1) + 1);\n      const mx = Math.max(...itens.map((i) => lg(i.v)));\n      itens.forEach((i) => {\n        const r = el('div', 'sm-barrow sm-barrow-w');\n        r.appendChild(el('span', 'k', i.nome));\n        const tr = el('span', 'tr');\n        const f = el('i');\n        f.style.width = pct(lg(i.v), mx) + '%';\n        f.style.background = '#1F6FD1';\n        tr.appendChild(f);\n        r.appendChild(tr);\n        r.appendChild(el('span', 'v', fmt(i.v)));\n        list.appendChild(r);\n      });\n      c.appendChild(list);\n    })();\n  })();\n\n  /* ------------------------------------------------------- aba 6: problemas */\n  (() => {\n    const pane = panes.problemas;\n    const SEV = ['Não classificado', 'Informação', 'Atenção', 'Média', 'Alta', 'Desastre'];\n    const CLS = ['n', 'i', 'w', 'm', 'h', 'd'];\n    const c = card(pane, 'Problemas ativos no Zabbix', 'Triggers em estado de problema para o host monitorado');\n    c.classList.add('sm-wide');\n    if (!problems.length) {\n      const ok = el('div', 'sm-empty');\n      ok.appendChild(icon('signal'));\n      ok.appendChild(el('p', '', 'Nenhum problema ativo. A coleta e a disponibilidade do GeoServer estão dentro dos limiares do template.'));\n      c.appendChild(ok);\n      return;\n    }\n    const tb = el('table', 'sm-table');\n    const thead = el('thead');\n    const trh = el('tr');\n    ['Severidade', 'Problema', 'Dados', 'Desde', 'Duração'].forEach((n, i) => trh.appendChild(el('th', i === 4 ? 'num' : '', n)));\n    thead.appendChild(trh);\n    tb.appendChild(thead);\n    const tbody = el('tbody');\n    problems.slice().sort((a, b) => (+b.severity || 0) - (+a.severity || 0) || (b.timestamp || 0) - (a.timestamp || 0)).forEach((p) => {\n      const tr = el('tr');\n      const sev = Math.max(0, Math.min(5, parseInt(p.severity, 10) || 0));\n      const td = el('td');\n      td.appendChild(el('span', 'sm-sev s' + CLS[sev], SEV[sev]));\n      tr.appendChild(td);\n      tr.appendChild(el('td', '', p.name || p.description || '–'));\n      tr.appendChild(el('td', 'desc', p.opdata || '–'));\n      const ts = (p.timestamp || p.lastchangeUnix || 0) * 1000;\n      tr.appendChild(el('td', '', ts ? new Date(ts).toLocaleString('pt-BR') : '–'));\n      tr.appendChild(el('td', 'num', ts ? age((now - ts) / 1000) : '–'));\n      tbody.appendChild(tr);\n    });\n    tb.appendChild(tbody);\n    c.appendChild(tb);\n  })();\n\n  app.appendChild(el('p', 'sm-foot',\n    'Posições da camada semob:ultima_posicao do GeoServer da SEMOB/DF, com nomes de empresa vindos do Zabbix. '\n    + 'Velocidade em km/h e rumo em graus conforme o Anexo Único da Portaria SEMOB nº 89/2019. '\n    + 'Permissionários do STPCR são pessoas físicas e aparecem apenas como Outros. Mapa base © OpenStreetMap.'));\n\n  /* Tabelas longas rolam dentro do próprio cartão, com o cabeçalho fixo */\n  app.querySelectorAll('table.sm-table').forEach((t) => {\n    if (t.parentElement && t.parentElement.classList.contains('sm-tscroll')) return;\n    const w = el('div', 'sm-tscroll' + (t.rows.length > 16 ? ' long' : ''));\n    t.parentNode.insertBefore(w, t);\n    w.appendChild(t);\n  });\n\n  /* O conteúdo ocupa toda a altura do painel: o mapa cresce e abas curtas não deixam faixa vazia */\n  const alturaUtil = () => {\n    for (let n = root, i = 0; n && i < 8; n = n.parentElement, i++) {\n      const oy = getComputedStyle(n).overflowY;\n      if ((oy === 'auto' || oy === 'scroll' || oy === 'hidden') && n.clientHeight > 240) return n.clientHeight;\n    }\n    return 0;\n  };\n  const ajustaAltura = () => {\n    const h = alturaUtil();\n    app.style.minHeight = h ? h + 'px' : '';\n    if (window.__smMap) window.__smMap.invalidateSize();\n  };\n  ajustaAltura();\n  if (window.ResizeObserver) {\n    if (window.__smRO) window.__smRO.disconnect();\n    window.__smRO = new ResizeObserver(() => ajustaAltura());\n    window.__smRO.observe(root.parentElement || root);\n  }\n\n  show(active);\n\n  /* ------------------------------------------------------------- o mapa real */\n  const popup = (r) => `<div class=\"sm-pop\"><header><b>${r.prefixo || 'sem prefixo'}</b>\n    <i style=\"background:${r.g.color}\"></i><span>${r.g.name}</span></header>\n    <dl><dt>Linha</dt><dd>${r.linha || 'não informada'}</dd>\n    <dt>Velocidade</dt><dd>${isFinite(r.vel) ? fmt(r.vel, 1) + ' km/h' : 'não informada'}</dd>\n    <dt>Rumo</dt><dd>${r.dir >= 0 && r.dir <= 360 ? fmt(r.dir, 0) + '° ' + rose(r.dir) : 'não informado'}</dd>\n    <dt>Último sinal</dt><dd>há ${age(r.idade)}</dd>\n    <dt>Coordenada</dt><dd>${fmt(r.lat, 5)}, ${fmt(r.lon, 5)}</dd></dl></div>`;\n\n  let destroy = () => {};\n  const fallback = (msg) => {\n    mapBox.innerHTML = '';\n    const cv = el('canvas', 'sm-canvas');\n    mapBox.appendChild(cv);\n    mapBox.appendChild(el('p', 'sm-mapmsg', msg));\n    const w = mapBox.clientWidth || 900, hh = mapBox.clientHeight || 560;\n    cv.width = w * devicePixelRatio; cv.height = hh * devicePixelRatio;\n    cv.style.width = w + 'px'; cv.style.height = hh + 'px';\n    const g = cv.getContext('2d');\n    g.scale(devicePixelRatio, devicePixelRatio);\n    const pts = live.filter((r) => !hidden[r.g.key]);\n    if (!pts.length) return;\n    const la = pts.map((r) => r.lat), lo = pts.map((r) => r.lon);\n    const a0 = quant(la, .01), a1 = quant(la, .99), o0 = quant(lo, .01), o1 = quant(lo, .99);\n    const kx = Math.cos(-15.8 * Math.PI / 180);\n    const k = Math.min((w - 48) / (((o1 - o0) * kx) || 1), (hh - 48) / ((a1 - a0) || 1));\n    pts.forEach((r) => {\n      g.fillStyle = r.g.color;\n      g.globalAlpha = r.vel > 0 ? .9 : .45;\n      g.beginPath();\n      g.arc(24 + (r.lon - o0) * kx * k, hh - 24 - (r.lat - a0) * k, r.vel > 0 ? 3 : 2, 0, 7);\n      g.fill();\n    });\n  };\n\n  const loadLeaflet = () => {\n    if (window.L && window.L.map) return Promise.resolve(window.L);\n    if (window.__smLeaflet) return window.__smLeaflet;\n    window.__smLeaflet = new Promise((res, rej) => {\n      const amd = window.define;\n      window.define = undefined; // o Grafana expõe AMD e o Leaflet não criaria window.L\n      const s = document.createElement('script');\n      const fail = (m) => { window.define = amd; window.__smLeaflet = null; rej(new Error(m)); };\n      s.src = LEAFLET;\n      s.onload = () => { window.define = amd; window.L ? res(window.L) : fail('o Leaflet não expôs window.L'); };\n      s.onerror = () => fail('falha ao baixar o Leaflet');\n      setTimeout(() => { if (!window.L) fail('tempo esgotado ao baixar o Leaflet'); }, 8000);\n      document.head.appendChild(s);\n    });\n    return window.__smLeaflet;\n  };\n\n  loadLeaflet().then((L) => {\n    if (!root.isConnected) return;\n    mapBox.innerHTML = '';\n    const host = el('div', 'sm-leaflet');\n    mapBox.appendChild(host);\n    const view = window.__smView || { center: [-15.80, -47.92], zoom: 11 };\n    const map = L.map(host, { preferCanvas: true, zoomControl: false, attributionControl: true }).setView(view.center, view.zoom);\n    window.__smMap = map;\n    L.control.zoom({ position: 'topleft' }).addTo(map);\n    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {\n      maxZoom: 19, attribution: '&copy; <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap</a>',\n    }).addTo(map);\n    host.classList.add('sm-tiles'); // dessatura o mapa base para os pontos ganharem destaque\n    const rend = L.canvas({ padding: .3 });\n    const layers = {}, marks = [];\n    live.forEach((r) => {\n      const lg = layers[r.g.key] || (layers[r.g.key] = L.layerGroup());\n      const andando = r.vel > 0;\n      const fresco = Math.max(.4, 1 - r.idade / Math.max(janela, 60));\n      lg.addLayer(L.circleMarker([r.lat, r.lon], {\n        renderer: rend, radius: andando ? 5 : 3.4, stroke: false, fillColor: r.g.color, fillOpacity: (andando ? .95 : .55) * fresco,\n      }).bindPopup(popup(r)));\n      marks.push(r);\n      if (andando && r.dir >= 0 && r.dir <= 360) {\n        const d = 70 + Math.min(r.vel, 80) * 6, a = r.dir * Math.PI / 180;\n        lg.addLayer(L.polyline([[r.lat, r.lon], [\n          r.lat + (d * Math.cos(a)) / 111320, r.lon + (d * Math.sin(a)) / (111320 * Math.cos(r.lat * Math.PI / 180)),\n        ]], { renderer: rend, color: r.g.color, weight: 2, opacity: .8 * fresco, interactive: false }));\n      }\n    });\n    Object.keys(layers).forEach((k) => { if (!hidden[k]) layers[k].addTo(map); });\n    const hi = L.layerGroup().addTo(map);\n\n    const Btn = (label, title, cb) => L.Control.extend({\n      onAdd() {\n        const b = L.DomUtil.create('button', 'sm-mapbtn');\n        b.type = 'button'; b.textContent = label; b.title = title;\n        L.DomEvent.disableClickPropagation(b);\n        b.onclick = cb;\n        return b;\n      },\n    });\n    const fit = () => {\n      const p = live.filter((r) => !hidden[r.g.key]).map((r) => [r.lat, r.lon]);\n      if (p.length) map.fitBounds(L.latLngBounds(p).pad(.05));\n    };\n    new (Btn('Enquadrar frota', 'Ajusta o mapa à frota visível', fit))({ position: 'topright' }).addTo(map);\n\n    const Legend = L.Control.extend({\n      onAdd() {\n        const d = L.DomUtil.create('div', 'sm-maplg');\n        d.innerHTML = '<b>Como ler</b><p><i class=\"big\"></i>círculo maior: veículo em movimento, com traço no rumo</p>'\n          + '<p><i></i>círculo menor: veículo parado</p><p>Quanto mais apagado, mais antigo é o sinal.</p>';\n        L.DomEvent.disableClickPropagation(d);\n        return d;\n      },\n    });\n    new Legend({ position: 'bottomleft' }).addTo(map);\n\n    Object.keys(cards).forEach((k) => {\n      cards[k].onclick = () => {\n        hidden[k] = !hidden[k];\n        cards[k].classList.toggle('off', !!hidden[k]);\n        if (layers[k]) { if (hidden[k] || input.value.trim()) map.removeLayer(layers[k]); else layers[k].addTo(map); }\n      };\n      cards[k].ondblclick = () => {\n        const p = live.filter((r) => r.g.key === k).map((r) => [r.lat, r.lon]);\n        if (p.length) map.fitBounds(L.latLngBounds(p).pad(.05));\n      };\n    });\n\n    /* com o mapa pronto, a busca também destaca e enquadra os veículos */\n    onSearch = (hit) => {\n      hi.clearLayers();\n      const busca = !!input.value.trim();\n      /* durante a busca o resto da frota sai do mapa; ao limpar, volta conforme as empresas ligadas */\n      Object.keys(layers).forEach((k) => {\n        const mostra = !busca && !hidden[k];\n        if (mostra && !map.hasLayer(layers[k])) layers[k].addTo(map);\n        if (!mostra && map.hasLayer(layers[k])) map.removeLayer(layers[k]);\n      });\n      hit.forEach((r) => {\n        if (r.vel > 0 && r.dir >= 0 && r.dir <= 360) {\n          const d = 120 + Math.min(r.vel, 80) * 8, a = r.dir * Math.PI / 180;\n          hi.addLayer(L.polyline([[r.lat, r.lon], [r.lat + (d * Math.cos(a)) / 111320, r.lon + (d * Math.sin(a)) / (111320 * Math.cos(r.lat * Math.PI / 180))]],\n            { renderer: rend, color: r.g.color, weight: 3, opacity: .9, interactive: false }));\n        }\n        hi.addLayer(L.circleMarker([r.lat, r.lon], { renderer: rend, radius: 14, color: r.g.color, weight: 2, opacity: .55, fill: false, interactive: false }));\n        hi.addLayer(L.circleMarker([r.lat, r.lon], { renderer: rend, radius: 8, color: '#fff', weight: 2.5, fillColor: r.g.color, fillOpacity: 1 }).bindPopup(popup(r)));\n      });\n      if (hit.length) map.fitBounds(L.latLngBounds(hit.map((r) => [r.lat, r.lon])).pad(.2), { maxZoom: 15 });\n    };\n    if (input.value.trim()) input.dispatchEvent(new Event('input'));\n    map.on('moveend', () => { window.__smView = { center: map.getCenter(), zoom: map.getZoom() }; });\n    setTimeout(() => map.invalidateSize(), 60);\n    destroy = () => { map.remove(); window.__smMap = null; };\n  }).catch((e) => {\n    fallback(`Mapa base indisponível (${e.message}). Mostrando a dispersão das coordenadas, sem ruas.`);\n    Object.keys(cards).forEach((k) => {\n      cards[k].onclick = () => {\n        hidden[k] = !hidden[k];\n        cards[k].classList.toggle('off', !!hidden[k]);\n        fallback('Mapa base indisponível.');\n      };\n    });\n  });\n\n  return () => destroy();\n} catch (err) {\n  /* fallback visível: sem isto, um erro deixaria o painel em branco */\n  root.innerHTML = '';\n  const box = document.createElement('div');\n  box.className = 'sm sm-error';\n  const h = document.createElement('h2');\n  h.textContent = 'O painel não conseguiu montar os dados';\n  const p1 = document.createElement('p');\n  p1.textContent = String((err && err.message) || err);\n  const p2 = document.createElement('p');\n  p2.className = 'sm-hint';\n  p2.textContent = 'Abra o painel em Edit > Query inspector e confira se as consultas A a G retornaram dados.';\n  box.appendChild(h); box.appendChild(p1); box.appendChild(p2);\n  root.appendChild(box);\n  console.error('[SEMOB]', err);\n}\n"
+      },
+      "id": 1,
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 36
+      }
+    }
+  ]
+}

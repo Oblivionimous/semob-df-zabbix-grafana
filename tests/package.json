@@ -1,0 +1,12 @@
+{
+  "name": "semob-df-panel-tests",
+  "private": true,
+  "description": "Teste do painel Business Text em jsdom, com Leaflet real",
+  "scripts": {
+    "test": "node panel.test.js"
+  },
+  "devDependencies": {
+    "jsdom": "24.1.3",
+    "leaflet": "1.9.4"
+  }
+}

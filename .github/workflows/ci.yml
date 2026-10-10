@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  testes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Instalar dependências
+        run: |
+          pip install -r tests/requirements.txt
+          npm ci --prefix tests --no-audit --no-fund
+
+      - name: Arquivos gerados em sincronia
+        run: |
+          python tools/sync_panel.py --check
+          python tools/gerar_referencia.py --check
+
+      - name: Template do Zabbix
+        run: python tests/test_template.py
+
+      - name: Scripts JavaScript do template
+        run: python tests/test_scripts.py
+
+      - name: Dashboard do Grafana
+        run: python tests/test_dashboard.py
+
+      - name: Painel em jsdom
+        run: npm test --prefix tests

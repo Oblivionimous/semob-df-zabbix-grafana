@@ -1,0 +1,2168 @@
+zabbix_export:
+  version: '7.0'
+  template_groups:
+    - uuid: a571c0d144b14fd4a87a9d9b2aa9fcd6
+      name: Templates/Applications
+  templates:
+    - uuid: f4a6af13cf4f4d2ebeec1948c021c85c
+      template: SEMOB DF GeoServer by HTTP
+      name: SEMOB DF GeoServer by HTTP
+      description: |-
+        Monitora dados públicos do GeoServer da SEMOB/DF (WFS 2.0 e WMS 1.3.0) por HTTP agent, sem agente, SSH ou script externo. Executado pelo Zabbix server ou proxy, que precisa de DNS e saída HTTPS.
+
+        Coleta: posições de ônibus (semob:ultima_posicao), frota cadastrada, contagem de registros por camada e disponibilidade do serviço por cenário web.
+
+        Campos sem unidade documentada pela SEMOB (velocidade) não recebem unidade. Base: investigação de leitura pública de 09/10/2026.
+      groups:
+        - name: Templates/Applications
+      items:
+        - uuid: b1d36ac176244da58ae49e9a8d4c9dbf
+          name: 'Posições: resposta WFS'
+          type: HTTP_AGENT
+          key: semob.positions.raw
+          delay: '{$SEMOB.POS.INTERVAL}'
+          history: '0'
+          value_type: TEXT
+          timeout: '{$SEMOB.TIMEOUT}'
+          url: '{$SEMOB.URL}'
+          query_fields:
+            - name: service
+              value: WFS
+            - name: version
+              value: 2.0.0
+            - name: request
+              value: GetFeature
+            - name: typeNames
+              value: semob:ultima_posicao
+            - name: outputFormat
+              value: application/json
+            - name: count
+              value: '{$SEMOB.POS.COUNT}'
+            - name: propertyName
+              value: id_operadora,prefixo,cd_linha,velocidade,latitude,longitude,dataregistro
+          verify_peer: 'YES'
+          verify_host: 'YES'
+          description: GetFeature da camada semob:ultima_posicao sem geometria e sem IMEI. Resposta mantida só em memória (histórico 0) porque o JSON completo (~1 MB) excede o limite de 64 KB do histórico Text. Falha HTTP é convertida em SEMOB_HTTP_ERROR para que o item "coleta válida" registre 0.
+          preprocessing:
+            - type: CHECK_NOT_SUPPORTED
+              parameters:
+                - '-1'
+              error_handler: CUSTOM_VALUE
+              error_handler_params: SEMOB_HTTP_ERROR
+          tags:
+            - tag: component
+              value: posicoes
+            - tag: origem
+              value: wfs
+        - uuid: 18eb163a42e445948f987fd703595a14
+          name: 'Posições: resumo calculado'
+          type: DEPENDENT
+          key: semob.positions.stats
+          delay: '0'
+          history: 1h
+          value_type: TEXT
+          description: JSON intermediário calculado por JavaScript. Mestre dos indicadores e da descoberta de operadoras. Histórico de 1h apenas para diagnóstico.
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  // Resume a camada semob:ultima_posicao (GeoJSON WFS 2.0) em indicadores numéricos.
+                  // Saída: JSON com ok=1 e contadores, ou ok=0 e error. Não lança exceção para manter o item "ok" coletando.
+                  var FRESH_MAX = parseInt('{$SEMOB.POS.FRESH.MAX}', 10);
+                  var STALE_MIN = parseInt('{$SEMOB.POS.STALE.MIN}', 10);
+                  var FUTURE_TOLERANCE = 120;
+
+                  function parseTs(s) {
+                      if (typeof s !== 'string') {
+                          return NaN;
+                      }
+                      var m = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.(\d+))?)?)?(Z|[+-]\d{2}:?\d{2})?$/.exec(s.trim());
+                      if (!m) {
+                          return NaN;
+                      }
+                      var ms = m[7] ? parseInt((m[7] + '00').substr(0, 3), 10) : 0;
+                      var t = Date.UTC(+m[1], +m[2] - 1, +m[3], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0), ms);
+                      if (m[8] && m[8] !== 'Z') {
+                          var tz = m[8].replace(':', '');
+                          var sign = tz.charAt(0) === '-' ? -1 : 1;
+                          t -= sign * (parseInt(tz.substr(1, 2), 10) * 60 + parseInt(tz.substr(3, 2), 10)) * 60000;
+                      }
+                      return t;
+                  }
+
+                  function toNum(v) {
+                      if (typeof v === 'number') {
+                          return isFinite(v) ? v : NaN;
+                      }
+                      if (typeof v !== 'string') {
+                          return NaN;
+                      }
+                      var s = v.trim().replace(',', '.');
+                      return /^-?\d+(\.\d+)?$/.test(s) ? parseFloat(s) : NaN;
+                  }
+
+                  function text(v) {
+                      return (v === null || v === undefined) ? '' : String(v).replace(/[\u0000-\u001f\u007f]/g, '').trim();
+                  }
+
+                  var out = {ok: 0};
+                  var data;
+
+                  try {
+                      data = JSON.parse(value);
+                  }
+                  catch (e) {
+                      out.error = 'Resposta não é JSON: falha HTTP ou ExceptionReport do GeoServer';
+                      return JSON.stringify(out);
+                  }
+
+                  if (!data || data.type !== 'FeatureCollection' || !(data.features instanceof Array)) {
+                      out.error = 'JSON sem FeatureCollection';
+                      return JSON.stringify(out);
+                  }
+
+                  var now = Date.now();
+                  var f = data.features;
+                  var seen = {}, lines = {}, opsActive = {}, ops = {};
+                  var s = {
+                      total: 0, fresh: 0, moving: 0, stale: 0, no_line: 0, invalid_coords: 0,
+                      invalid_timestamps: 0, duplicates: 0, speed_errors: 0
+                  };
+                  var newest = NaN, speedSum = 0, speedN = 0;
+
+                  for (var i = 0; i < f.length; i++) {
+                      var p = (f[i] && f[i].properties) || {};
+                      s.total++;
+
+                      var opId = (p.id_operadora === null || p.id_operadora === undefined) ? 'desconhecida' : text(p.id_operadora);
+                      if (!ops[opId]) {
+                          ops[opId] = {total: 0, fresh: 0, moving: 0, no_line: 0};
+                      }
+                      var op = ops[opId];
+                      op.total++;
+
+                      var key = opId + '|' + text(p.prefixo);
+                      if (seen[key]) {
+                          s.duplicates++;
+                      }
+                      seen[key] = 1;
+
+                      var lat = p.latitude, lon = p.longitude;
+                      if (typeof lat !== 'number' || typeof lon !== 'number' || !isFinite(lat) || !isFinite(lon)
+                              || Math.abs(lat) > 90 || Math.abs(lon) > 180 || (lat === 0 && lon === 0)) {
+                          s.invalid_coords++;
+                      }
+
+                      var speed = toNum(p.velocidade);
+                      if (isNaN(speed) && text(p.velocidade) !== '') {
+                          s.speed_errors++;
+                      }
+
+                      var ts = parseTs(p.dataregistro);
+                      var age = (now - ts) / 1000;
+                      if (isNaN(ts) || age < -FUTURE_TOLERANCE) {
+                          s.invalid_timestamps++;
+                          continue;
+                      }
+                      if (isNaN(newest) || ts > newest) {
+                          newest = ts;
+                      }
+                      if (age > STALE_MIN) {
+                          s.stale++;
+                      }
+                      if (age > FRESH_MAX) {
+                          continue;
+                      }
+
+                      var line = text(p.cd_linha);
+                      s.fresh++;
+                      op.fresh++;
+                      opsActive[opId] = 1;
+                      if (line === '') {
+                          s.no_line++;
+                          op.no_line++;
+                      }
+                      else {
+                          lines[line] = 1;
+                      }
+                      if (speed > 0) {
+                          s.moving++;
+                          op.moving++;
+                          speedSum += speed;
+                          speedN++;
+                      }
+                  }
+
+                  out.ok = 1;
+                  out.returned = f.length;
+                  if (typeof data.numberMatched === 'number') {
+                      out.matched = data.numberMatched;
+                  }
+                  else if (typeof data.totalFeatures === 'number') {
+                      out.matched = data.totalFeatures;
+                  }
+                  out.complete = (out.matched !== undefined && f.length >= out.matched) ? 1 : 0;
+
+                  for (var k in s) {
+                      out[k] = s[k];
+                  }
+                  out.fresh_pct = s.total > 0 ? Math.round(s.fresh * 10000 / s.total) / 100 : 0;
+                  out.lines_active = Object.keys(lines).length;
+                  out.operators_active = Object.keys(opsActive).length;
+                  if (!isNaN(newest)) {
+                      out.newest_age = Math.max(0, Math.round((now - newest) / 1000));
+                  }
+                  if (speedN > 0) {
+                      out.speed_avg = Math.round(speedSum * 100 / speedN) / 100;
+                  }
+
+                  var ids = Object.keys(ops).sort();
+                  out.operators = ops;
+                  out.lld = [];
+                  for (var j = 0; j < ids.length; j++) {
+                      out.lld.push({'{#OPERADORA.ID}': ids[j]});
+                  }
+
+                  return JSON.stringify(out);
+          master_item:
+            key: semob.positions.raw
+          tags:
+            - tag: component
+              value: posicoes
+        - uuid: 3bb6d67618e547a287022c4f30e6c93f
+          name: 'Posições: coleta válida'
+          type: DEPENDENT
+          key: semob.positions.ok
+          delay: '0'
+          history: 7d
+          value_type: UNSIGNED
+          description: 1 quando a resposta é uma FeatureCollection GeoJSON. 0 em falha HTTP, ExceptionReport ou JSON inválido.
+          valuemap:
+            name: SEMOB coleta
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.ok
+          master_item:
+            key: semob.positions.stats
+          tags:
+            - tag: component
+              value: disponibilidade
+          triggers:
+            - uuid: cdf7a44c0a804f069531d05e1ea25e20
+              expression: max(/SEMOB DF GeoServer by HTTP/semob.positions.ok,#3)=0
+              name: 'SEMOB: coleta de posições inválida nas três últimas tentativas'
+              priority: AVERAGE
+              description: 'O GeoServer não entregou uma FeatureCollection válida em três coletas seguidas. Verifique em Dados mais recentes o item "Posições: resumo calculado" (campo error).'
+              dependencies:
+                - name: 'SEMOB: GeoServer falhou no cenário web'
+                  expression: last(/SEMOB DF GeoServer by HTTP/web.test.fail[SEMOB GeoServer])<>0
+              tags:
+                - tag: scope
+                  value: availability
+            - uuid: 9f06f3a420e84005aaeae2af7b38d16f
+              expression: nodata(/SEMOB DF GeoServer by HTTP/semob.positions.ok,{$SEMOB.POS.NODATA})=1
+              name: 'SEMOB: posições sem coleta há {$SEMOB.POS.NODATA}'
+              priority: WARNING
+              description: 'Nenhum valor recebido. Causas prováveis: host desativado, poller HTTP sobrecarregado ou proxy offline.'
+              tags:
+                - tag: scope
+                  value: availability
+        - uuid: 9724628b10464b74b3c52ffbc46978e0
+          name: 'Posições: resposta completa'
+          type: DEPENDENT
+          key: semob.positions.complete
+          delay: '0'
+          history: 7d
+          value_type: UNSIGNED
+          description: 1 quando numberReturned alcança numberMatched. 0 indica truncamento por count ou total desconhecido.
+          valuemap:
+            name: SEMOB completude
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.complete
+              error_handler: DISCARD_VALUE
+          master_item:
+            key: semob.positions.stats
+          tags:
+            - tag: component
+              value: qualidade
+          triggers:
+            - uuid: 30cbc7cfc9f445e7a98f8d57706acc99
+              expression: last(/SEMOB DF GeoServer by HTTP/semob.positions.complete)=0
+              name: 'SEMOB: resposta de posições truncada'
+              opdata: 'Retornados: {ITEM.LASTVALUE1}'
+              priority: WARNING
+              description: numberReturned menor que numberMatched. Aumente {$SEMOB.POS.COUNT}. Os indicadores refletem só a parte recebida.
+              dependencies:
+                - name: 'SEMOB: coleta de posições inválida nas três últimas tentativas'
+                  expression: max(/SEMOB DF GeoServer by HTTP/semob.positions.ok,#3)=0
+              tags:
+                - tag: scope
+                  value: quality
+        - uuid: 6e352651fb75432db5079df15f8b6209
+          name: 'Posições: registros na camada'
+          type: DEPENDENT
+          key: semob.positions.matched
+          delay: '0'
+          history: 7d
+          value_type: UNSIGNED
+          description: numberMatched publicado pelo GeoServer. É contagem de registros, não de veículos em operação.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.matched
+              error_handler: DISCARD_VALUE
+          master_item:
+            key: semob.positions.stats
+          tags:
+            - tag: component
+              value: posicoes
+        - uuid: 3483d3a1817d4fb99585912dfa18a816
+          name: 'Posições: registros retornados'
+          type: DEPENDENT
+          key: semob.positions.returned
+          delay: '0'
+          history: 7d
+          value_type: UNSIGNED
+          description: Quantidade de feições recebidas nesta coleta.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.returned
+              error_handler: DISCARD_VALUE
+          master_item:
+            key: semob.positions.stats
+          tags:
+            - tag: component
+              value: posicoes
+        - uuid: a5ab2ce8db144281ab68b7875d845b17
+          name: 'Posições: veículos com registro recente'
+          type: DEPENDENT
+          key: semob.positions.fresh
+          delay: '0'
+          history: 7d
+          value_type: UNSIGNED
+          description: Registros com dataregistro de até {$SEMOB.POS.FRESH.MAX} segundos. Idade de dataregistro não comprova idade da posição GPS.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.fresh
+              error_handler: DISCARD_VALUE
+          master_item:
+            key: semob.positions.stats
+          tags:
+            - tag: component
+              value: posicoes
+          triggers:
+            - uuid: 0ec32d416a574a0c809f32ac4104d6b9
+              expression: max(/SEMOB DF GeoServer by HTTP/semob.positions.fresh,15m)=0
+              name: 'SEMOB: nenhum veículo com registro recente há 15 minutos'
+              priority: WARNING
+              description: A coleta funciona, mas nenhum registro tem dataregistro recente. O feed da SEMOB pode estar parado.
+              dependencies:
+                - name: 'SEMOB: coleta de posições inválida nas três últimas tentativas'
+                  expression: max(/SEMOB DF GeoServer by HTTP/semob.positions.ok,#3)=0
+              tags:
+                - tag: scope
+                  value: quality
+        - uuid: c5caff709b5147eab6124aacb5e89401
+          name: 'Posições: percentual de registros recentes'
+          type: DEPENDENT
+          key: semob.positions.fresh_pct
+          delay: '0'
+          history: 7d
+          value_type: FLOAT
+          units: '%'
+          description: Registros recentes divididos pelo total da camada. Varia ao longo do dia conforme a frota em operação.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.fresh_pct
+              error_handler: DISCARD_VALUE
+          master_item:
+            key: semob.positions.stats
+          tags:
+            - tag: component
+              value: posicoes
+        - uuid: c204dbad06754afaa77d76b5e4738662
+          name: 'Posições: veículos recentes em movimento'
+          type: DEPENDENT
+          key: semob.positions.moving
+          delay: '0'
+          history: 7d
+          value_type: UNSIGNED
+          description: Registros recentes com velocidade maior que zero.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.moving
+              error_handler: DISCARD_VALUE
+          master_item:
+            key: semob.positions.stats
+          tags:
+            - tag: component
+              value: posicoes
+        - uuid: 6a9fc56e04484748a64d89f9b5aee3b4
+          name: 'Posições: registros com mais de 24 horas'
+          type: DEPENDENT
+          key: semob.positions.stale
+          delay: '0'
+          history: 7d
+          value_type: UNSIGNED
+          description: Registros com dataregistro acima de {$SEMOB.POS.STALE.MIN} segundos. Indicam veículos sem transmissão.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.stale
+              error_handler: DISCARD_VALUE
+          master_item:
+            key: semob.positions.stats
+          tags:
+            - tag: component
+              value: posicoes
+        - uuid: 50f9068197d84fd8977aae19c7d566b9
+          name: 'Posições: veículos recentes sem linha'
+          type: DEPENDENT
+          key: semob.positions.no_line
+          delay: '0'
+          history: 7d
+          value_type: UNSIGNED
+          description: Registros recentes com cd_linha vazio.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.no_line
+              error_handler: DISCARD_VALUE
+          master_item:
+            key: semob.positions.stats
+          tags:
+            - tag: component
+              value: qualidade
+        - uuid: 5160091dbb4346da93259808d463ac7e
+          name: 'Posições: linhas com veículo recente'
+          type: DEPENDENT
+          key: semob.positions.lines_active
+          delay: '0'
+          history: 7d
+          value_type: UNSIGNED
+          description: Valores distintos de cd_linha entre os registros recentes.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.lines_active
+              error_handler: DISCARD_VALUE
+          master_item:
+            key: semob.positions.stats
+          tags:
+            - tag: component
+              value: posicoes
+        - uuid: 3475e2a13592447e9bec7502649d427c
+          name: 'Posições: operadoras com veículo recente'
+          type: DEPENDENT
+          key: semob.positions.operators_active
+          delay: '0'
+          history: 7d
+          value_type: UNSIGNED
+          description: Valores distintos de id_operadora entre os registros recentes.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.operators_active
+              error_handler: DISCARD_VALUE
+          master_item:
+            key: semob.positions.stats
+          tags:
+            - tag: component
+              value: posicoes
+        - uuid: 805ee5061c7a4fc78db4f79c3ab47ca8
+          name: 'Posições: idade do registro mais recente'
+          type: DEPENDENT
+          key: semob.positions.newest_age
+          delay: '0'
+          history: 7d
+          value_type: UNSIGNED
+          units: s
+          description: Segundos entre o horário do servidor Zabbix e o maior dataregistro válido. Mede atraso do feed. Depende do relógio do server/proxy sincronizado (NTP).
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.newest_age
+              error_handler: DISCARD_VALUE
+          master_item:
+            key: semob.positions.stats
+          tags:
+            - tag: component
+              value: posicoes
+          triggers:
+            - uuid: caf357f28ee7473bac9935c856442764
+              expression: min(/SEMOB DF GeoServer by HTTP/semob.positions.newest_age,5m)>{$SEMOB.POS.AGE.MAX}
+              name: 'SEMOB: feed de posições atrasado'
+              opdata: 'Idade: {ITEM.LASTVALUE1}'
+              priority: HIGH
+              description: O registro mais recente está mais velho que {$SEMOB.POS.AGE.MAX} segundos durante 5 minutos.
+              dependencies:
+                - name: 'SEMOB: coleta de posições inválida nas três últimas tentativas'
+                  expression: max(/SEMOB DF GeoServer by HTTP/semob.positions.ok,#3)=0
+              tags:
+                - tag: scope
+                  value: quality
+        - uuid: d8a8165501b94af89f16d20583388f7b
+          name: 'Posições: velocidade média reportada'
+          type: DEPENDENT
+          key: semob.positions.speed_avg
+          delay: '0'
+          history: 7d
+          value_type: FLOAT
+          units: km/h
+          description: Média do campo velocidade dos veículos recentes em movimento. Unidade km/h, conforme o Anexo Único da Portaria SEMOB nº 89/2019. Vírgula decimal é convertida.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.speed_avg
+              error_handler: DISCARD_VALUE
+          master_item:
+            key: semob.positions.stats
+          tags:
+            - tag: component
+              value: posicoes
+        - uuid: 631b9ae5e1f341409d417bbb7db02659
+          name: 'Posições: coordenadas inválidas'
+          type: DEPENDENT
+          key: semob.positions.invalid_coords
+          delay: '0'
+          history: 7d
+          value_type: UNSIGNED
+          description: Latitude/longitude nulas, fora dos limites globais ou iguais a (0,0). Não verifica se o ponto está no DF.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.invalid_coords
+              error_handler: DISCARD_VALUE
+          master_item:
+            key: semob.positions.stats
+          tags:
+            - tag: component
+              value: qualidade
+          triggers:
+            - uuid: 3aa548fabd034d579865933bf1bdd99b
+              expression: min(/SEMOB DF GeoServer by HTTP/semob.positions.invalid_coords,30m)>{$SEMOB.POS.INVALID.MAX}
+              name: 'SEMOB: coordenadas inválidas acima do limite'
+              opdata: 'Registros: {ITEM.LASTVALUE1}'
+              priority: INFO
+              description: Registros sem coordenada utilizável aparecem no feed há 30 minutos.
+              dependencies:
+                - name: 'SEMOB: coleta de posições inválida nas três últimas tentativas'
+                  expression: max(/SEMOB DF GeoServer by HTTP/semob.positions.ok,#3)=0
+              tags:
+                - tag: scope
+                  value: quality
+        - uuid: f08fbcbc73ce48e5a539f7e86bc68d3a
+          name: 'Posições: datas inválidas ou futuras'
+          type: DEPENDENT
+          key: semob.positions.invalid_timestamps
+          delay: '0'
+          history: 7d
+          value_type: UNSIGNED
+          description: dataregistro ausente, fora do formato ISO 8601 ou mais de 120 s no futuro.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.invalid_timestamps
+              error_handler: DISCARD_VALUE
+          master_item:
+            key: semob.positions.stats
+          tags:
+            - tag: component
+              value: qualidade
+        - uuid: d8da7a7b2d264117ab48d1eb2457513e
+          name: 'Posições: duplicidades operadora e prefixo'
+          type: DEPENDENT
+          key: semob.positions.duplicates
+          delay: '0'
+          history: 7d
+          value_type: UNSIGNED
+          description: Registros que repetem o par id_operadora + prefixo no mesmo snapshot.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.duplicates
+              error_handler: DISCARD_VALUE
+          master_item:
+            key: semob.positions.stats
+          tags:
+            - tag: component
+              value: qualidade
+          triggers:
+            - uuid: c71c89f513d2407d9d3827b63093defe
+              expression: min(/SEMOB DF GeoServer by HTTP/semob.positions.duplicates,30m)>0
+              name: 'SEMOB: veículos duplicados no feed de posições'
+              opdata: 'Duplicados: {ITEM.LASTVALUE1}'
+              priority: INFO
+              description: O par id_operadora + prefixo aparece mais de uma vez há 30 minutos.
+              dependencies:
+                - name: 'SEMOB: coleta de posições inválida nas três últimas tentativas'
+                  expression: max(/SEMOB DF GeoServer by HTTP/semob.positions.ok,#3)=0
+              tags:
+                - tag: scope
+                  value: quality
+        - uuid: d528d005d8b549f192d70b6b13f47b8a
+          name: 'Posições: velocidades não numéricas'
+          type: DEPENDENT
+          key: semob.positions.speed_errors
+          delay: '0'
+          history: 7d
+          value_type: UNSIGNED
+          description: Valores de velocidade preenchidos que não convertem para número.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.speed_errors
+              error_handler: DISCARD_VALUE
+          master_item:
+            key: semob.positions.stats
+          tags:
+            - tag: component
+              value: qualidade
+        - uuid: 2261912f3ddf4487a4451a9658891c3d
+          name: 'Frota: resposta WFS'
+          type: HTTP_AGENT
+          key: semob.fleet.raw
+          delay: '{$SEMOB.FLEET.INTERVAL}'
+          history: '0'
+          value_type: TEXT
+          timeout: '{$SEMOB.TIMEOUT}'
+          url: '{$SEMOB.URL}'
+          query_fields:
+            - name: service
+              value: WFS
+            - name: version
+              value: 2.0.0
+            - name: request
+              value: GetFeature
+            - name: typeNames
+              value: semob:Frota por Operadora
+            - name: outputFormat
+              value: application/json
+            - name: count
+              value: '{$SEMOB.FLEET.COUNT}'
+            - name: propertyName
+              value: operadora,ano_fabrica,data_referencia
+          verify_peer: 'YES'
+          verify_host: 'YES'
+          description: GetFeature da camada semob:Frota por Operadora sem placa. Resposta mantida só em memória.
+          preprocessing:
+            - type: CHECK_NOT_SUPPORTED
+              parameters:
+                - '-1'
+              error_handler: CUSTOM_VALUE
+              error_handler_params: SEMOB_HTTP_ERROR
+          tags:
+            - tag: component
+              value: frota
+            - tag: origem
+              value: wfs
+        - uuid: e682bceac57245c3925dc31960463635
+          name: 'Frota: resumo calculado'
+          type: DEPENDENT
+          key: semob.fleet.stats
+          delay: '0'
+          history: 7d
+          value_type: TEXT
+          description: JSON intermediário com totais, idade média e frota por operadora.
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  // Resume a camada "semob:Frota por Operadora" (GeoJSON WFS 2.0): total, idade e frota por operadora.
+                  var out = {ok: 0};
+                  var data;
+
+                  try {
+                      data = JSON.parse(value);
+                  }
+                  catch (e) {
+                      out.error = 'Resposta não é JSON: falha HTTP ou ExceptionReport do GeoServer';
+                      return JSON.stringify(out);
+                  }
+
+                  if (!data || data.type !== 'FeatureCollection' || !(data.features instanceof Array)) {
+                      out.error = 'JSON sem FeatureCollection';
+                      return JSON.stringify(out);
+                  }
+
+                  // Permissionários do STPCR são pessoas físicas: os nomes não saem deste script, só o total agregado.
+                  var STPCR_BUCKET = 'STPCR (permissionários)';
+
+                  function text(v) {
+                      return (v === null || v === undefined) ? '' : String(v).replace(/[\u0000-\u001f\u007f]/g, '').trim();
+                  }
+
+                  function slug(name) {
+                      var from = 'ÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇÑáàâãäéèêëíìîïóòôõöúùûüçñ';
+                      var to = 'AAAAAEEEEIIIIOOOOOUUUUCNAAAAAEEEEIIIIOOOOOUUUUCN';
+                      var r = '';
+                      for (var i = 0; i < name.length; i++) {
+                          var c = name.charAt(i), x = from.indexOf(c);
+                          r += x >= 0 ? to.charAt(x) : c;
+                      }
+                      r = r.toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+                      return r === '' ? 'SEM_NOME' : r;
+                  }
+
+                  var now = new Date();
+                  var year = now.getUTCFullYear();
+                  var f = data.features;
+                  var byName = {}, newestRef = NaN, ageSum = 0, ageN = 0, invalidYear = 0;
+
+                  for (var i = 0; i < f.length; i++) {
+                      var p = (f[i] && f[i].properties) || {};
+                      var name = text(p.operadora) || '(sem operadora)';
+                      if (name !== '(sem operadora)' && !/BACIA/i.test(name) && !/COOBRATAETE/i.test(name)) {
+                          name = STPCR_BUCKET;
+                      }
+                      if (!byName[name]) {
+                          byName[name] = {total: 0, ageSum: 0, ageN: 0};
+                      }
+                      var o = byName[name];
+                      o.total++;
+
+                      var y = parseInt(p.ano_fabrica, 10);
+                      if (isNaN(y) || y < 1950 || y > year + 1) {
+                          invalidYear++;
+                      }
+                      else {
+                          var age = Math.max(0, year - y);
+                          o.ageSum += age;
+                          o.ageN++;
+                          ageSum += age;
+                          ageN++;
+                      }
+
+                      var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(text(p.data_referencia));
+                      if (m) {
+                          var t = Date.UTC(+m[1], +m[2] - 1, +m[3]);
+                          if (isNaN(newestRef) || t > newestRef) {
+                              newestRef = t;
+                          }
+                      }
+                  }
+
+                  var names = Object.keys(byName).sort();
+                  var used = {};
+                  out.ok = 1;
+                  out.total = f.length;
+                  out.operators_count = names.length;
+                  out.invalid_year = invalidYear;
+                  if (ageN > 0) {
+                      out.avg_age = Math.round(ageSum * 100 / ageN) / 100;
+                  }
+                  if (!isNaN(newestRef)) {
+                      out.ref_age = Math.max(0, Math.round((now.getTime() - newestRef) / 1000));
+                  }
+                  out.operators = {};
+                  out.lld = [];
+
+                  for (var j = 0; j < names.length; j++) {
+                      var base = slug(names[j]), key = base, n = 2;
+                      while (used[key]) {
+                          key = base + '_' + n++;
+                      }
+                      used[key] = 1;
+                      var e = byName[names[j]];
+                      out.operators[key] = {name: names[j], total: e.total};
+                      if (e.ageN > 0) {
+                          out.operators[key].avg_age = Math.round(e.ageSum * 100 / e.ageN) / 100;
+                      }
+                      var m = /BACIA\s*-?\s*0?(\d)/i.exec(names[j]);
+                      var servico = /COOBRATAETE/i.test(names[j]) ? 'cooperativa' : (m ? 'concessão' : 'STPCR');
+                      if (names[j] === '(sem operadora)') {
+                          servico = 'não identificado';
+                      }
+                      out.lld.push({'{#OPERADORA.NOME}': names[j], '{#OPERADORA.KEY}': key,
+                                    '{#OPERADORA.BACIA}': m ? '0' + m[1] : 'sem bacia', '{#OPERADORA.SERVICO}': servico});
+                  }
+
+                  return JSON.stringify(out);
+          master_item:
+            key: semob.fleet.raw
+          tags:
+            - tag: component
+              value: frota
+        - uuid: ce567d5795d54e4ca062fc025d82efbc
+          name: 'Frota: coleta válida'
+          type: DEPENDENT
+          key: semob.fleet.ok
+          delay: '0'
+          history: 31d
+          value_type: UNSIGNED
+          description: 1 quando a resposta é uma FeatureCollection GeoJSON.
+          valuemap:
+            name: SEMOB coleta
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.ok
+          master_item:
+            key: semob.fleet.stats
+          tags:
+            - tag: component
+              value: disponibilidade
+          triggers:
+            - uuid: 1c0e89a2f95c462692e90c76a849e809
+              expression: last(/SEMOB DF GeoServer by HTTP/semob.fleet.ok)=0
+              name: 'SEMOB: coleta da frota inválida'
+              priority: WARNING
+              description: 'A última consulta da frota não retornou FeatureCollection. Veja o campo error em "Frota: resumo calculado".'
+              dependencies:
+                - name: 'SEMOB: GeoServer falhou no cenário web'
+                  expression: last(/SEMOB DF GeoServer by HTTP/web.test.fail[SEMOB GeoServer])<>0
+              tags:
+                - tag: scope
+                  value: availability
+        - uuid: 2b9d69b9b58c46a8b68afe9e83df7a5b
+          name: 'Frota: veículos cadastrados'
+          type: DEPENDENT
+          key: semob.fleet.total
+          delay: '0'
+          history: 31d
+          value_type: UNSIGNED
+          description: Registros da camada de frota. Cadastro, não veículos em operação.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.total
+              error_handler: DISCARD_VALUE
+          master_item:
+            key: semob.fleet.stats
+          tags:
+            - tag: component
+              value: frota
+        - uuid: 74ee4d6cf2b04b0eb3ee2ebd38dd8559
+          name: 'Frota: operadoras cadastradas'
+          type: DEPENDENT
+          key: semob.fleet.operators
+          delay: '0'
+          history: 31d
+          value_type: UNSIGNED
+          description: Valores distintos do campo operadora.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.operators_count
+              error_handler: DISCARD_VALUE
+          master_item:
+            key: semob.fleet.stats
+          tags:
+            - tag: component
+              value: frota
+        - uuid: 96b3c9d6a39d4994b391c3e725ea109e
+          name: 'Frota: idade média'
+          type: DEPENDENT
+          key: semob.fleet.avg_age
+          delay: '0'
+          history: 31d
+          value_type: FLOAT
+          units: anos
+          description: Ano corrente menos ano_fabrica. Anos nulos, anteriores a 1950 ou futuros ficam fora da média.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.avg_age
+              error_handler: DISCARD_VALUE
+          master_item:
+            key: semob.fleet.stats
+          tags:
+            - tag: component
+              value: frota
+        - uuid: 56121e5abf814cac99c9c246658f372f
+          name: 'Frota: ano de fabricação inválido'
+          type: DEPENDENT
+          key: semob.fleet.invalid_year
+          delay: '0'
+          history: 31d
+          value_type: UNSIGNED
+          description: Registros sem ano_fabrica utilizável.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.invalid_year
+              error_handler: DISCARD_VALUE
+          master_item:
+            key: semob.fleet.stats
+          tags:
+            - tag: component
+              value: qualidade
+        - uuid: e9ab84cdd8ce4592b2c292c1bb16d008
+          name: 'Frota: idade da data de referência'
+          type: DEPENDENT
+          key: semob.fleet.ref_age
+          delay: '0'
+          history: 31d
+          value_type: UNSIGNED
+          units: s
+          description: Tempo desde a maior data_referencia publicada.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.ref_age
+              error_handler: DISCARD_VALUE
+          master_item:
+            key: semob.fleet.stats
+          tags:
+            - tag: component
+              value: frota
+          triggers:
+            - uuid: d0841fb035cd4f62b2a2fa0990e74540
+              expression: last(/SEMOB DF GeoServer by HTTP/semob.fleet.ref_age)>{$SEMOB.FLEET.REF.MAX}
+              name: 'SEMOB: cadastro de frota desatualizado'
+              opdata: 'Idade: {ITEM.LASTVALUE1}'
+              priority: INFO
+              description: A maior data_referencia está mais antiga que {$SEMOB.FLEET.REF.MAX}.
+              dependencies:
+                - name: 'SEMOB: coleta da frota inválida'
+                  expression: last(/SEMOB DF GeoServer by HTTP/semob.fleet.ok)=0
+              tags:
+                - tag: scope
+                  value: quality
+        - uuid: 9018fe98d835430485b759b5a8f2231e
+          name: 'WFS: GetCapabilities'
+          type: HTTP_AGENT
+          key: semob.wfs.capabilities
+          delay: '{$SEMOB.CAPS.INTERVAL}'
+          history: '0'
+          value_type: TEXT
+          timeout: '{$SEMOB.TIMEOUT}'
+          url: '{$SEMOB.URL}'
+          query_fields:
+            - name: service
+              value: WFS
+            - name: version
+              value: 2.0.0
+            - name: request
+              value: GetCapabilities
+          verify_peer: 'YES'
+          verify_host: 'YES'
+          description: Documento de capacidades do WFS. Mestre da descoberta de camadas.
+          tags:
+            - tag: component
+              value: camadas
+            - tag: origem
+              value: wfs
+        - uuid: dd3d011c5f484e7fb2eff512cd5c17c2
+          name: 'WFS: camadas publicadas'
+          type: DEPENDENT
+          key: semob.wfs.layers
+          delay: '0'
+          history: 31d
+          value_type: UNSIGNED
+          description: Quantidade de FeatureType no GetCapabilities. Em 09/10/2026 eram 14.
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  // Extrai Name e Title de cada FeatureType do WFS GetCapabilities (prefixos de namespace opcionais).
+                  if (value.indexOf('WFS_Capabilities') === -1) {
+                      throw 'Resposta não é um documento WFS GetCapabilities';
+                  }
+
+                  function decode(s) {
+                      return s.replace(/&#(\d+);/g, function (m, n) { return String.fromCharCode(parseInt(n, 10)); })
+                          .replace(/&#x([0-9a-fA-F]+);/g, function (m, n) { return String.fromCharCode(parseInt(n, 16)); })
+                          .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'")
+                          .replace(/&amp;/g, '&').trim();
+                  }
+
+                  var re = /<(?:[\w.-]+:)?FeatureType\b[^>]*>([\s\S]*?)<\/(?:[\w.-]+:)?FeatureType>/g;
+                  var out = [], seen = {}, m;
+
+                  while ((m = re.exec(value)) !== null) {
+                      var name = /<(?:[\w.-]+:)?Name\b[^>]*>([^<]*)</.exec(m[1]);
+                      if (!name) {
+                          continue;
+                      }
+                      var n = decode(name[1]);
+                      if (n === '' || seen[n]) {
+                          continue;
+                      }
+                      seen[n] = 1;
+                      var title = /<(?:[\w.-]+:)?Title\b[^>]*>([^<]*)</.exec(m[1]);
+                      out.push({'{#CAMADA}': n, '{#CAMADA.TITULO}': title ? decode(title[1]) : n});
+                  }
+
+                  if (out.length === 0) {
+                      throw 'Nenhum FeatureType encontrado no GetCapabilities';
+                  }
+
+                  out.sort(function (a, b) { return a['{#CAMADA}'] < b['{#CAMADA}'] ? -1 : 1; });
+                  return JSON.stringify(out);
+            - type: JSONPATH
+              parameters:
+                - $.length()
+          master_item:
+            key: semob.wfs.capabilities
+          tags:
+            - tag: component
+              value: camadas
+          triggers:
+            - uuid: b7fd3c7683784ee28f5e38e5c99d37d0
+              expression: change(/SEMOB DF GeoServer by HTTP/semob.wfs.layers)<>0
+              name: 'SEMOB: catálogo WFS mudou de quantidade de camadas'
+              opdata: 'Camadas: {ITEM.LASTVALUE1}'
+              priority: INFO
+              description: Camadas foram publicadas ou removidas. Revise as camadas descobertas.
+              manual_close: 'YES'
+              tags:
+                - tag: scope
+                  value: inventory
+      discovery_rules:
+        - uuid: a603628fea51443eb61d1e7c6c5a2ae7
+          name: Descoberta de operadoras nas posições
+          type: SCRIPT
+          key: semob.positions.operators.discovery
+          delay: '{$SEMOB.OPERADORAS.INTERVAL}'
+          params: |
+            // Descobre as operadoras presentes nas posições e traduz id_operadora para nome com a camada "Horários das Linhas".
+            // Parâmetros do item: url, count.
+            // Classificação: nome com BACIA = concessão, COOBRATAETE = cooperativa, demais nomes = permissionário do STPCR.
+            // Permissionários do STPCR são pessoas físicas: o nome é substituído antes da saída e não chega ao Zabbix.
+            var p = JSON.parse(value);
+
+            function wfs(typeName, props, count) {
+                var req = new HttpRequest();
+                var url = p.url + '?service=WFS&version=2.0.0&request=GetFeature&outputFormat=application%2Fjson'
+                    + '&typeNames=' + encodeURIComponent(typeName) + '&propertyName=' + encodeURIComponent(props)
+                    + (count ? '&count=' + encodeURIComponent(count) : '');
+                var body = req.get(url);
+                if (req.getStatus() !== 200) {
+                    throw 'HTTP ' + req.getStatus() + ' ao consultar ' + typeName;
+                }
+                var d;
+                try {
+                    d = JSON.parse(body);
+                }
+                catch (e) {
+                    throw 'Resposta não JSON ao consultar ' + typeName;
+                }
+                if (!d || d.type !== 'FeatureCollection' || !(d.features instanceof Array)) {
+                    throw 'Resposta sem FeatureCollection ao consultar ' + typeName;
+                }
+                return d.features;
+            }
+
+            function text(v) {
+                return (v === null || v === undefined) ? '' : String(v).replace(/[\u0000-\u001f\u007f]/g, '').trim();
+            }
+
+            function classify(name, known) {
+                if (!known) {
+                    return {servico: 'não identificado', bacia: 'sem bacia'};
+                }
+                var m = /BACIA\s*-?\s*0?(\d)/i.exec(name);
+                var bacia = m ? '0' + m[1] : 'sem bacia';
+                if (/COOBRATAETE/i.test(name)) {
+                    return {servico: 'cooperativa', bacia: bacia};
+                }
+                return {servico: m ? 'concessão' : 'STPCR', bacia: bacia};
+            }
+
+            var names = {};
+            var sched = wfs('semob:Horários das Linhas', 'id_operadora,nm_operadora');
+            for (var i = 0; i < sched.length; i++) {
+                var sp = sched[i].properties || {};
+                var sid = text(sp.id_operadora), sname = text(sp.nm_operadora);
+                if (sid !== '' && sname !== '') {
+                    names[sid] = sname;
+                }
+            }
+
+            var ids = {};
+            var pos = wfs('semob:ultima_posicao', 'id_operadora', p.count);
+            for (var j = 0; j < pos.length; j++) {
+                var pp = pos[j].properties || {};
+                ids[(pp.id_operadora === null || pp.id_operadora === undefined) ? 'desconhecida' : text(pp.id_operadora)] = 1;
+            }
+
+            var out = [], list = Object.keys(ids).sort();
+            for (var k = 0; k < list.length; k++) {
+                var id = list[k], known = names.hasOwnProperty(id);
+                var name = known ? names[id] : (id === 'desconhecida' ? 'sem id_operadora' : 'não identificada');
+                var c = classify(name, known);
+                if (c.servico === 'STPCR') {
+                    name = 'STPCR (permissionário)';  // pessoa física: o nome não é publicado no Zabbix
+                }
+                out.push({'{#OPERADORA.ID}': id, '{#OPERADORA.NOME}': name,
+                          '{#OPERADORA.BACIA}': c.bacia, '{#OPERADORA.SERVICO}': c.servico});
+            }
+
+            if (out.length === 0) {
+                throw 'Nenhuma operadora encontrada nas posições';
+            }
+            return JSON.stringify(out);
+          parameters:
+            - name: url
+              value: '{$SEMOB.URL}'
+            - name: count
+              value: '{$SEMOB.POS.COUNT}'
+          timeout: '{$SEMOB.TIMEOUT}'
+          filter:
+            evaltype: AND
+            conditions:
+              - macro: '{#OPERADORA.SERVICO}'
+                value: '{$SEMOB.OPERADORA.SERVICO.EXCLUIR}'
+                operator: NOT_MATCHES_REGEX
+                formulaid: A
+          description: 'Script: lê os id_operadora das posições e traduz para nome pela camada "Horários das Linhas". Classifica pelo nome publicado: BACIA = concessão, COOBRATAETE = cooperativa, demais = STPCR. Permissionários do STPCR são pessoas físicas: o nome é substituído no script e, pelo filtro padrão, eles e os códigos sem nome não geram itens. Os totais gerais continuam incluindo todos os veículos.'
+          item_prototypes:
+            - uuid: 4b0a40172ea34075896c266470cc4261
+              name: 'Operadora [{#OPERADORA.ID} - {#OPERADORA.NOME}]: registros'
+              type: DEPENDENT
+              key: semob.positions.operator.total[{#OPERADORA.ID}]
+              delay: '0'
+              history: 7d
+              value_type: UNSIGNED
+              description: Registros da operadora no snapshot. Identificador id_operadora da SEMOB.
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - $.operators['{#OPERADORA.ID}'].total
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: semob.positions.stats
+              tags:
+                - tag: component
+                  value: posicoes
+                - tag: operadora
+                  value: '{#OPERADORA.NOME}'
+                - tag: operadora_id
+                  value: '{#OPERADORA.ID}'
+                - tag: bacia
+                  value: '{#OPERADORA.BACIA}'
+                - tag: servico
+                  value: '{#OPERADORA.SERVICO}'
+            - uuid: 091ed6631e724c98b0ec0df7de41e6e6
+              name: 'Operadora [{#OPERADORA.ID} - {#OPERADORA.NOME}]: veículos com registro recente'
+              type: DEPENDENT
+              key: semob.positions.operator.fresh[{#OPERADORA.ID}]
+              delay: '0'
+              history: 7d
+              value_type: UNSIGNED
+              description: Registros com dataregistro de até {$SEMOB.POS.FRESH.MAX} segundos. Identificador id_operadora da SEMOB.
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - $.operators['{#OPERADORA.ID}'].fresh
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: semob.positions.stats
+              tags:
+                - tag: component
+                  value: posicoes
+                - tag: operadora
+                  value: '{#OPERADORA.NOME}'
+                - tag: operadora_id
+                  value: '{#OPERADORA.ID}'
+                - tag: bacia
+                  value: '{#OPERADORA.BACIA}'
+                - tag: servico
+                  value: '{#OPERADORA.SERVICO}'
+            - uuid: 7e507c1f407646f78a8187b0f357e737
+              name: 'Operadora [{#OPERADORA.ID} - {#OPERADORA.NOME}]: veículos recentes em movimento'
+              type: DEPENDENT
+              key: semob.positions.operator.moving[{#OPERADORA.ID}]
+              delay: '0'
+              history: 7d
+              value_type: UNSIGNED
+              description: Registros recentes com velocidade maior que zero. Identificador id_operadora da SEMOB.
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - $.operators['{#OPERADORA.ID}'].moving
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: semob.positions.stats
+              tags:
+                - tag: component
+                  value: posicoes
+                - tag: operadora
+                  value: '{#OPERADORA.NOME}'
+                - tag: operadora_id
+                  value: '{#OPERADORA.ID}'
+                - tag: bacia
+                  value: '{#OPERADORA.BACIA}'
+                - tag: servico
+                  value: '{#OPERADORA.SERVICO}'
+            - uuid: 262802a30c9e4f5db13a8592145d242d
+              name: 'Operadora [{#OPERADORA.ID} - {#OPERADORA.NOME}]: veículos recentes sem linha'
+              type: DEPENDENT
+              key: semob.positions.operator.no_line[{#OPERADORA.ID}]
+              delay: '0'
+              history: 7d
+              value_type: UNSIGNED
+              description: Registros recentes com cd_linha vazio. Identificador id_operadora da SEMOB.
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - $.operators['{#OPERADORA.ID}'].no_line
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: semob.positions.stats
+              tags:
+                - tag: component
+                  value: posicoes
+                - tag: operadora
+                  value: '{#OPERADORA.NOME}'
+                - tag: operadora_id
+                  value: '{#OPERADORA.ID}'
+                - tag: bacia
+                  value: '{#OPERADORA.BACIA}'
+                - tag: servico
+                  value: '{#OPERADORA.SERVICO}'
+          graph_prototypes:
+            - uuid: 1fad0fced7454363b036eb45c7895c9b
+              name: 'Operadora [{#OPERADORA.ID} - {#OPERADORA.NOME}]: veículos'
+              graph_items:
+                - color: 199C0D
+                  item:
+                    host: SEMOB DF GeoServer by HTTP
+                    key: semob.positions.operator.fresh[{#OPERADORA.ID}]
+                - sortorder: '1'
+                  color: 2774A4
+                  item:
+                    host: SEMOB DF GeoServer by HTTP
+                    key: semob.positions.operator.moving[{#OPERADORA.ID}]
+                - sortorder: '2'
+                  color: F63100
+                  item:
+                    host: SEMOB DF GeoServer by HTTP
+                    key: semob.positions.operator.no_line[{#OPERADORA.ID}]
+                - sortorder: '3'
+                  color: A54F10
+                  item:
+                    host: SEMOB DF GeoServer by HTTP
+                    key: semob.positions.operator.total[{#OPERADORA.ID}]
+          lifetime: 7d
+          enabled_lifetime_type: DISABLE_AFTER
+          enabled_lifetime: 1d
+        - uuid: 527ba75db46b497aaa27b88e13dc8916
+          name: Descoberta de operadoras na frota
+          type: DEPENDENT
+          key: semob.fleet.operators.discovery
+          delay: '0'
+          description: Uma entrada por operadora da camada de frota. {#OPERADORA.KEY} é o nome sem acentos. Permissionários do STPCR (pessoas físicas) são somados em uma única entrada, sem nomes.
+          item_prototypes:
+            - uuid: 54941f22699b40fca3992a79d9110f30
+              name: 'Frota [{#OPERADORA.NOME}]: veículos cadastrados'
+              type: DEPENDENT
+              key: semob.fleet.operator.total[{#OPERADORA.KEY}]
+              delay: '0'
+              history: 31d
+              value_type: UNSIGNED
+              description: Registros da operadora na camada de frota.
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - $.operators['{#OPERADORA.KEY}'].total
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: semob.fleet.stats
+              tags:
+                - tag: component
+                  value: frota
+                - tag: operadora
+                  value: '{#OPERADORA.NOME}'
+                - tag: bacia
+                  value: '{#OPERADORA.BACIA}'
+                - tag: servico
+                  value: '{#OPERADORA.SERVICO}'
+            - uuid: 05eca948a7164a2caab7c5fd7a3a3756
+              name: 'Frota [{#OPERADORA.NOME}]: idade média'
+              type: DEPENDENT
+              key: semob.fleet.operator.avg_age[{#OPERADORA.KEY}]
+              delay: '0'
+              history: 31d
+              value_type: FLOAT
+              units: anos
+              description: Idade média da frota da operadora pelo ano_fabrica.
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - $.operators['{#OPERADORA.KEY}'].avg_age
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: semob.fleet.stats
+              tags:
+                - tag: component
+                  value: frota
+                - tag: operadora
+                  value: '{#OPERADORA.NOME}'
+                - tag: bacia
+                  value: '{#OPERADORA.BACIA}'
+                - tag: servico
+                  value: '{#OPERADORA.SERVICO}'
+          master_item:
+            key: semob.fleet.stats
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  // Repassa a lista LLD somente quando a coleta é válida. Coleta inválida não remove recursos descobertos.
+                  var d = JSON.parse(value);
+                  if (d.ok !== 1) {
+                      throw 'Coleta inválida: ' + (d.error || 'sem detalhe');
+                  }
+                  return JSON.stringify(d.lld);
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          lifetime: 7d
+          enabled_lifetime_type: DISABLE_AFTER
+          enabled_lifetime: 1d
+        - uuid: f138fd7b007547d1806c00eef6959180
+          name: Descoberta de camadas WFS
+          type: DEPENDENT
+          key: semob.wfs.layers.discovery
+          delay: '0'
+          filter:
+            evaltype: AND
+            conditions:
+              - macro: '{#CAMADA}'
+                value: '{$SEMOB.LAYER.MATCHES}'
+                formulaid: A
+              - macro: '{#CAMADA}'
+                value: '{$SEMOB.LAYER.NOT_MATCHES}'
+                operator: NOT_MATCHES_REGEX
+                formulaid: B
+          description: 'Cria um contador resultType=hits por camada. Passageiros fica excluída por padrão: consultas sem filtro excederam 20 s na investigação de 09/10/2026.'
+          item_prototypes:
+            - uuid: 49fb454faeb94330890f9a4b18ed830a
+              name: 'Camada [{#CAMADA}]: registros'
+              type: HTTP_AGENT
+              key: semob.layer.count["{#CAMADA}"]
+              delay: '{$SEMOB.LAYER.INTERVAL}'
+              history: 31d
+              value_type: UNSIGNED
+              timeout: '{$SEMOB.TIMEOUT}'
+              url: '{$SEMOB.URL}'
+              query_fields:
+                - name: service
+                  value: WFS
+                - name: version
+                  value: 2.0.0
+                - name: request
+                  value: GetFeature
+                - name: typeNames
+                  value: '{#CAMADA}'
+                - name: resultType
+                  value: hits
+              verify_peer: 'YES'
+              verify_host: 'YES'
+              description: 'numberMatched via resultType=hits, sem baixar feições. Título: {#CAMADA.TITULO}. Em camadas de horários e viagens a contagem é de registros, não de linhas distintas.'
+              preprocessing:
+                - type: CHECK_NOT_SUPPORTED
+                  parameters:
+                    - '-1'
+                  error_handler: DISCARD_VALUE
+                - type: CHECK_XML_ERROR
+                  parameters:
+                    - string(//*[local-name()='ExceptionText'])
+                - type: XMLPATH
+                  parameters:
+                    - string(/*[local-name()='FeatureCollection']/@numberMatched)
+              tags:
+                - tag: component
+                  value: camadas
+                - tag: camada
+                  value: '{#CAMADA}'
+              trigger_prototypes:
+                - uuid: 7bd2469cc2334ad7b12b843895535a73
+                  expression: last(/SEMOB DF GeoServer by HTTP/semob.layer.count["{#CAMADA}"])=0
+                  name: 'SEMOB: camada {#CAMADA} sem registros'
+                  priority: WARNING
+                  description: O GeoServer informou numberMatched=0 para a camada.
+                  tags:
+                    - tag: scope
+                      value: quality
+                - uuid: 3ca9976651d9448bb3e7f73f2c9efb70
+                  expression: nodata(/SEMOB DF GeoServer by HTTP/semob.layer.count["{#CAMADA}"],{$SEMOB.LAYER.NODATA})=1
+                  name: 'SEMOB: camada {#CAMADA} sem contagem há {$SEMOB.LAYER.NODATA}'
+                  priority: WARNING
+                  description: Falhas HTTP são descartadas no pré-processamento. A ausência prolongada de valores indica erro de coleta.
+                  tags:
+                    - tag: scope
+                      value: availability
+          master_item:
+            key: semob.wfs.capabilities
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  // Extrai Name e Title de cada FeatureType do WFS GetCapabilities (prefixos de namespace opcionais).
+                  if (value.indexOf('WFS_Capabilities') === -1) {
+                      throw 'Resposta não é um documento WFS GetCapabilities';
+                  }
+
+                  function decode(s) {
+                      return s.replace(/&#(\d+);/g, function (m, n) { return String.fromCharCode(parseInt(n, 10)); })
+                          .replace(/&#x([0-9a-fA-F]+);/g, function (m, n) { return String.fromCharCode(parseInt(n, 16)); })
+                          .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'")
+                          .replace(/&amp;/g, '&').trim();
+                  }
+
+                  var re = /<(?:[\w.-]+:)?FeatureType\b[^>]*>([\s\S]*?)<\/(?:[\w.-]+:)?FeatureType>/g;
+                  var out = [], seen = {}, m;
+
+                  while ((m = re.exec(value)) !== null) {
+                      var name = /<(?:[\w.-]+:)?Name\b[^>]*>([^<]*)</.exec(m[1]);
+                      if (!name) {
+                          continue;
+                      }
+                      var n = decode(name[1]);
+                      if (n === '' || seen[n]) {
+                          continue;
+                      }
+                      seen[n] = 1;
+                      var title = /<(?:[\w.-]+:)?Title\b[^>]*>([^<]*)</.exec(m[1]);
+                      out.push({'{#CAMADA}': n, '{#CAMADA.TITULO}': title ? decode(title[1]) : n});
+                  }
+
+                  if (out.length === 0) {
+                      throw 'Nenhum FeatureType encontrado no GetCapabilities';
+                  }
+
+                  out.sort(function (a, b) { return a['{#CAMADA}'] < b['{#CAMADA}'] ? -1 : 1; });
+                  return JSON.stringify(out);
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          lifetime: 7d
+          enabled_lifetime_type: DISABLE_AFTER
+          enabled_lifetime: 1d
+      httptests:
+        - uuid: c4880b47b2ee4eb78406f9331a586fe2
+          name: SEMOB GeoServer
+          delay: '{$SEMOB.WEB.INTERVAL}'
+          attempts: '2'
+          steps:
+            - name: WFS GetCapabilities
+              url: '{$SEMOB.URL}'
+              query_fields:
+                - name: service
+                  value: WFS
+                - name: version
+                  value: 2.0.0
+                - name: request
+                  value: GetCapabilities
+              timeout: '{$SEMOB.TIMEOUT}'
+              required: WFS_Capabilities
+              status_codes: '200'
+            - name: WFS GetFeature
+              url: '{$SEMOB.URL}'
+              query_fields:
+                - name: service
+                  value: WFS
+                - name: version
+                  value: 2.0.0
+                - name: request
+                  value: GetFeature
+                - name: typeNames
+                  value: semob:ultima_posicao
+                - name: count
+                  value: '1'
+                - name: outputFormat
+                  value: application/json
+                - name: propertyName
+                  value: dataregistro
+              timeout: '{$SEMOB.TIMEOUT}'
+              required: FeatureCollection
+              status_codes: '200'
+            - name: WMS GetCapabilities
+              url: '{$SEMOB.URL}'
+              query_fields:
+                - name: service
+                  value: WMS
+                - name: version
+                  value: 1.3.0
+                - name: request
+                  value: GetCapabilities
+              timeout: '{$SEMOB.TIMEOUT}'
+              required: WMS_Capabilities
+              status_codes: '200'
+          verify_peer: 'YES'
+          verify_host: 'YES'
+          tags:
+            - tag: component
+              value: disponibilidade
+      tags:
+        - tag: class
+          value: software
+        - tag: target
+          value: semob-df
+      macros:
+        - macro: '{$SEMOB.URL}'
+          value: https://geoserver.semob.df.gov.br/geoserver/ows
+          description: Endpoint OGC (WFS/WMS) do GeoServer da SEMOB/DF.
+        - macro: '{$SEMOB.TIMEOUT}'
+          value: 30s
+          description: Timeout dos HTTP agents e das etapas do cenário web. Máximo 10m no Zabbix 7.0.
+        - macro: '{$SEMOB.POS.INTERVAL}'
+          value: 1m
+          description: Intervalo da coleta de posições. Ponto de partida, não publicado pela SEMOB.
+        - macro: '{$SEMOB.POS.COUNT}'
+          value: '10000'
+          description: Parâmetro count do GetFeature de posições. Em 09/10/2026 a camada tinha 3619 registros.
+        - macro: '{$SEMOB.POS.FRESH.MAX}'
+          value: '300'
+          description: Idade máxima de dataregistro, em segundos, para considerar o registro recente.
+        - macro: '{$SEMOB.POS.STALE.MIN}'
+          value: '86400'
+          description: Idade, em segundos, a partir da qual o registro é considerado antigo.
+        - macro: '{$SEMOB.POS.AGE.MAX}'
+          value: '600'
+          description: Atraso máximo, em segundos, do registro mais recente antes do alerta.
+        - macro: '{$SEMOB.POS.NODATA}'
+          value: 10m
+          description: Janela sem valores de coleta antes do alerta de nodata.
+        - macro: '{$SEMOB.POS.INVALID.MAX}'
+          value: '0'
+          description: Quantidade tolerada de coordenadas inválidas.
+        - macro: '{$SEMOB.FLEET.INTERVAL}'
+          value: 1h
+          description: Intervalo da coleta da camada de frota. A descoberta só é reprocessada quando a lista muda.
+        - macro: '{$SEMOB.FLEET.COUNT}'
+          value: '50000'
+          description: Parâmetro count do GetFeature de frota. Em 09/10/2026 eram 3172 registros.
+        - macro: '{$SEMOB.FLEET.REF.MAX}'
+          value: 3d
+          description: Idade máxima aceita para a maior data_referencia da frota.
+        - macro: '{$SEMOB.OPERADORAS.INTERVAL}'
+          value: 1h
+          description: Intervalo da descoberta de operadoras. Cada execução baixa as posições e a camada Horários das Linhas, com dois campos.
+        - macro: '{$SEMOB.OPERADORA.SERVICO.EXCLUIR}'
+          value: ^(STPCR|não identificado)$
+          description: 'Regex de serviços excluídos da descoberta de operadoras. Padrão: permissionários pessoas físicas e códigos sem nome.'
+        - macro: '{$SEMOB.CAPS.INTERVAL}'
+          value: 1h
+          description: Intervalo do GetCapabilities. A descoberta de camadas só é reprocessada quando a lista muda.
+        - macro: '{$SEMOB.LAYER.INTERVAL}'
+          value: 1h
+          description: Intervalo dos contadores resultType=hits por camada (resposta de poucos bytes).
+        - macro: '{$SEMOB.LAYER.NODATA}'
+          value: 1d
+          description: Janela sem contagem de uma camada antes do alerta.
+        - macro: '{$SEMOB.LAYER.MATCHES}'
+          value: .*
+          description: Regex de camadas incluídas na descoberta.
+        - macro: '{$SEMOB.LAYER.NOT_MATCHES}'
+          value: passageiros
+          description: Regex de camadas excluídas da descoberta.
+        - macro: '{$SEMOB.WEB.INTERVAL}'
+          value: 5m
+          description: Intervalo do cenário web de disponibilidade.
+        - macro: '{$SEMOB.RESP.MAX}'
+          value: '5'
+          description: Tempo médio máximo, em segundos, da etapa WFS GetFeature.
+      dashboards:
+        - uuid: fba80b3d02ea4524aa43309a94e62093
+          name: 'SEMOB DF: transporte público'
+          pages:
+            - name: Operação
+              widgets:
+                - type: item
+                  name: Coleta de posições
+                  x: '0'
+                  y: '0'
+                  width: '12'
+                  height: '3'
+                  fields:
+                    - type: INTEGER
+                      name: decimal_places
+                      value: '0'
+                    - type: ITEM
+                      name: itemid.0
+                      value:
+                        host: SEMOB DF GeoServer by HTTP
+                        key: semob.positions.ok
+                    - type: INTEGER
+                      name: show.0
+                      value: '2'
+                - type: item
+                  name: Veículos recentes
+                  x: '12'
+                  y: '0'
+                  width: '12'
+                  height: '3'
+                  fields:
+                    - type: INTEGER
+                      name: decimal_places
+                      value: '0'
+                    - type: ITEM
+                      name: itemid.0
+                      value:
+                        host: SEMOB DF GeoServer by HTTP
+                        key: semob.positions.fresh
+                    - type: INTEGER
+                      name: show.0
+                      value: '2'
+                - type: item
+                  name: Em movimento
+                  x: '24'
+                  y: '0'
+                  width: '12'
+                  height: '3'
+                  fields:
+                    - type: INTEGER
+                      name: decimal_places
+                      value: '0'
+                    - type: ITEM
+                      name: itemid.0
+                      value:
+                        host: SEMOB DF GeoServer by HTTP
+                        key: semob.positions.moving
+                    - type: INTEGER
+                      name: show.0
+                      value: '2'
+                - type: item
+                  name: Idade do registro mais recente
+                  x: '36'
+                  y: '0'
+                  width: '12'
+                  height: '3'
+                  fields:
+                    - type: INTEGER
+                      name: decimal_places
+                      value: '0'
+                    - type: ITEM
+                      name: itemid.0
+                      value:
+                        host: SEMOB DF GeoServer by HTTP
+                        key: semob.positions.newest_age
+                    - type: INTEGER
+                      name: show.0
+                      value: '2'
+                - type: item
+                  name: Linhas com veículo
+                  x: '48'
+                  y: '0'
+                  width: '12'
+                  height: '3'
+                  fields:
+                    - type: INTEGER
+                      name: decimal_places
+                      value: '0'
+                    - type: ITEM
+                      name: itemid.0
+                      value:
+                        host: SEMOB DF GeoServer by HTTP
+                        key: semob.positions.lines_active
+                    - type: INTEGER
+                      name: show.0
+                      value: '2'
+                - type: item
+                  name: Operadoras com veículo
+                  x: '60'
+                  y: '0'
+                  width: '12'
+                  height: '3'
+                  fields:
+                    - type: INTEGER
+                      name: decimal_places
+                      value: '0'
+                    - type: ITEM
+                      name: itemid.0
+                      value:
+                        host: SEMOB DF GeoServer by HTTP
+                        key: semob.positions.operators_active
+                    - type: INTEGER
+                      name: show.0
+                      value: '2'
+                - type: graph
+                  x: '0'
+                  y: '3'
+                  width: '36'
+                  height: '5'
+                  fields:
+                    - type: GRAPH
+                      name: graphid.0
+                      value:
+                        host: SEMOB DF GeoServer by HTTP
+                        name: 'SEMOB: veículos por estado'
+                    - type: STRING
+                      name: reference
+                      value: SEMOA
+                - type: graph
+                  x: '36'
+                  y: '3'
+                  width: '36'
+                  height: '5'
+                  fields:
+                    - type: GRAPH
+                      name: graphid.0
+                      value:
+                        host: SEMOB DF GeoServer by HTTP
+                        name: 'SEMOB: idade do registro mais recente'
+                    - type: STRING
+                      name: reference
+                      value: SEMOB
+                - type: honeycomb
+                  name: Veículos recentes por operadora
+                  x: '0'
+                  y: '8'
+                  width: '72'
+                  height: '4'
+                  fields:
+                    - type: STRING
+                      name: items.0
+                      value: 'Operadora [*]: veículos com registro recente'
+                    - type: STRING
+                      name: primary_label
+                      value: '{{ITEM.NAME}.regsub("\[\S+ - (?:AUTO VIAÇÃO |VIAÇÃO |EXPRESSO )?(.+?)(?: -| BACIA)", "\1")}'
+                    - type: INTEGER
+                      name: primary_label_size
+                      value: '15'
+                    - type: INTEGER
+                      name: primary_label_size_type
+                      value: '1'
+                    - type: INTEGER
+                      name: secondary_label_decimal_places
+                      value: '0'
+                    - type: STRING
+                      name: reference
+                      value: SEMOC
+                - type: svggraph
+                  name: Veículos recentes por operadora
+                  x: '0'
+                  y: '12'
+                  width: '36'
+                  height: '5'
+                  fields:
+                    - type: STRING
+                      name: ds.0.items.0
+                      value: 'Operadora [* - *PIRACICABANA*]: veículos com registro recente'
+                    - type: STRING
+                      name: ds.0.color
+                      value: 2E9E44
+                    - type: INTEGER
+                      name: ds.0.type
+                      value: '0'
+                    - type: INTEGER
+                      name: ds.0.fill
+                      value: '0'
+                    - type: INTEGER
+                      name: ds.0.width
+                      value: '2'
+                    - type: STRING
+                      name: ds.1.items.0
+                      value: 'Operadora [* - *PIONEIRA*]: veículos com registro recente'
+                    - type: STRING
+                      name: ds.1.color
+                      value: F2C200
+                    - type: INTEGER
+                      name: ds.1.type
+                      value: '0'
+                    - type: INTEGER
+                      name: ds.1.fill
+                      value: '0'
+                    - type: INTEGER
+                      name: ds.1.width
+                      value: '2'
+                    - type: STRING
+                      name: ds.2.items.0
+                      value: 'Operadora [* - *URBI*]: veículos com registro recente'
+                    - type: STRING
+                      name: ds.2.color
+                      value: 1F6FD1
+                    - type: INTEGER
+                      name: ds.2.type
+                      value: '0'
+                    - type: INTEGER
+                      name: ds.2.fill
+                      value: '0'
+                    - type: INTEGER
+                      name: ds.2.width
+                      value: '2'
+                    - type: STRING
+                      name: ds.3.items.0
+                      value: 'Operadora [* - *MARECHAL*]: veículos com registro recente'
+                    - type: STRING
+                      name: ds.3.color
+                      value: FF7F11
+                    - type: INTEGER
+                      name: ds.3.type
+                      value: '0'
+                    - type: INTEGER
+                      name: ds.3.fill
+                      value: '0'
+                    - type: INTEGER
+                      name: ds.3.width
+                      value: '2'
+                    - type: STRING
+                      name: ds.4.items.0
+                      value: 'Operadora [* - *SÃO JOSÉ*]: veículos com registro recente'
+                    - type: STRING
+                      name: ds.4.color
+                      value: 5C3317
+                    - type: INTEGER
+                      name: ds.4.type
+                      value: '0'
+                    - type: INTEGER
+                      name: ds.4.fill
+                      value: '0'
+                    - type: INTEGER
+                      name: ds.4.width
+                      value: '2'
+                    - type: STRING
+                      name: ds.5.items.0
+                      value: 'Operadora [* - *COOBRATAETE*]: veículos com registro recente'
+                    - type: STRING
+                      name: ds.5.color
+                      value: 9E9E9E
+                    - type: INTEGER
+                      name: ds.5.type
+                      value: '0'
+                    - type: INTEGER
+                      name: ds.5.fill
+                      value: '0'
+                    - type: INTEGER
+                      name: ds.5.width
+                      value: '2'
+                    - type: INTEGER
+                      name: legend_lines
+                      value: '2'
+                    - type: STRING
+                      name: lefty_min
+                      value: '0'
+                    - type: STRING
+                      name: reference
+                      value: SEMOD
+                - type: graph
+                  x: '36'
+                  y: '12'
+                  width: '36'
+                  height: '5'
+                  fields:
+                    - type: GRAPH
+                      name: graphid.0
+                      value:
+                        host: SEMOB DF GeoServer by HTTP
+                        name: 'SEMOB: tempo de resposta do GeoServer'
+                    - type: STRING
+                      name: reference
+                      value: SEMOE
+            - name: Qualidade e cadastros
+              widgets:
+                - type: graph
+                  x: '0'
+                  y: '0'
+                  width: '36'
+                  height: '5'
+                  fields:
+                    - type: GRAPH
+                      name: graphid.0
+                      value:
+                        host: SEMOB DF GeoServer by HTTP
+                        name: 'SEMOB: qualidade do feed de posições'
+                    - type: STRING
+                      name: reference
+                      value: SEMOF
+                - type: graph
+                  x: '36'
+                  y: '0'
+                  width: '36'
+                  height: '5'
+                  fields:
+                    - type: GRAPH
+                      name: graphid.0
+                      value:
+                        host: SEMOB DF GeoServer by HTTP
+                        name: 'SEMOB: velocidade média reportada'
+                    - type: STRING
+                      name: reference
+                      value: SEMOG
+                - type: item
+                  name: Frota cadastrada
+                  x: '0'
+                  y: '5'
+                  width: '18'
+                  height: '3'
+                  fields:
+                    - type: INTEGER
+                      name: decimal_places
+                      value: '0'
+                    - type: ITEM
+                      name: itemid.0
+                      value:
+                        host: SEMOB DF GeoServer by HTTP
+                        key: semob.fleet.total
+                    - type: INTEGER
+                      name: show.0
+                      value: '2'
+                - type: item
+                  name: Operadoras na frota
+                  x: '18'
+                  y: '5'
+                  width: '18'
+                  height: '3'
+                  fields:
+                    - type: INTEGER
+                      name: decimal_places
+                      value: '0'
+                    - type: ITEM
+                      name: itemid.0
+                      value:
+                        host: SEMOB DF GeoServer by HTTP
+                        key: semob.fleet.operators
+                    - type: INTEGER
+                      name: show.0
+                      value: '2'
+                - type: item
+                  name: Idade média da frota
+                  x: '36'
+                  y: '5'
+                  width: '18'
+                  height: '3'
+                  fields:
+                    - type: INTEGER
+                      name: decimal_places
+                      value: '1'
+                    - type: ITEM
+                      name: itemid.0
+                      value:
+                        host: SEMOB DF GeoServer by HTTP
+                        key: semob.fleet.avg_age
+                    - type: INTEGER
+                      name: show.0
+                      value: '2'
+                - type: item
+                  name: Idade da referência da frota
+                  x: '54'
+                  y: '5'
+                  width: '18'
+                  height: '3'
+                  fields:
+                    - type: INTEGER
+                      name: decimal_places
+                      value: '0'
+                    - type: ITEM
+                      name: itemid.0
+                      value:
+                        host: SEMOB DF GeoServer by HTTP
+                        key: semob.fleet.ref_age
+                    - type: INTEGER
+                      name: show.0
+                      value: '2'
+                - type: piechart
+                  name: Frota cadastrada por operadora
+                  x: '0'
+                  y: '8'
+                  width: '36'
+                  height: '6'
+                  fields:
+                    - type: INTEGER
+                      name: draw_type
+                      value: '1'
+                    - type: INTEGER
+                      name: legend_aggregation
+                      value: '1'
+                    - type: INTEGER
+                      name: total_show
+                      value: '1'
+                    - type: STRING
+                      name: time_period.from
+                      value: now-2d
+                    - type: STRING
+                      name: time_period.to
+                      value: now
+                    - type: STRING
+                      name: ds.0.items.0
+                      value: 'Frota [*PIRACICABANA*]: veículos cadastrados'
+                    - type: STRING
+                      name: ds.0.color
+                      value: 2E9E44
+                    - type: STRING
+                      name: ds.1.items.0
+                      value: 'Frota [*PIONEIRA*]: veículos cadastrados'
+                    - type: STRING
+                      name: ds.1.color
+                      value: F2C200
+                    - type: STRING
+                      name: ds.2.items.0
+                      value: 'Frota [*URBI*]: veículos cadastrados'
+                    - type: STRING
+                      name: ds.2.color
+                      value: 1F6FD1
+                    - type: STRING
+                      name: ds.3.items.0
+                      value: 'Frota [*MARECHAL*]: veículos cadastrados'
+                    - type: STRING
+                      name: ds.3.color
+                      value: FF7F11
+                    - type: STRING
+                      name: ds.4.items.0
+                      value: 'Frota [*SÃO JOSÉ*]: veículos cadastrados'
+                    - type: STRING
+                      name: ds.4.color
+                      value: 5C3317
+                    - type: STRING
+                      name: ds.5.items.0
+                      value: 'Frota [*COOBRATAETE*]: veículos cadastrados'
+                    - type: STRING
+                      name: ds.5.color
+                      value: 9E9E9E
+                    - type: STRING
+                      name: ds.6.items.0
+                      value: 'Frota [*STPCR*]: veículos cadastrados'
+                    - type: STRING
+                      name: ds.6.color
+                      value: D62828
+                - type: honeycomb
+                  name: Registros por camada WFS
+                  x: '36'
+                  y: '8'
+                  width: '36'
+                  height: '6'
+                  fields:
+                    - type: STRING
+                      name: items.0
+                      value: 'Camada [*]: registros'
+                    - type: STRING
+                      name: primary_label
+                      value: '{{ITEM.NAME}.regsub("\[(?:semob:)?(.*?)\]", "\1")}'
+                    - type: INTEGER
+                      name: primary_label_size
+                      value: '15'
+                    - type: INTEGER
+                      name: primary_label_size_type
+                      value: '1'
+                    - type: INTEGER
+                      name: secondary_label_decimal_places
+                      value: '0'
+                    - type: STRING
+                      name: reference
+                      value: SEMOH
+      valuemaps:
+        - uuid: 20e5ac2e801d42aeacfb9fffc94b6ac7
+          name: SEMOB coleta
+          mappings:
+            - value: '0'
+              newvalue: Falha
+            - value: '1'
+              newvalue: OK
+        - uuid: 8be14c4123fd4723bd8c00bb66234a26
+          name: SEMOB completude
+          mappings:
+            - value: '0'
+              newvalue: Incompleta
+            - value: '1'
+              newvalue: Completa
+  triggers:
+    - uuid: b44d830faea648d0804f1f6a8a2f8a57
+      expression: last(/SEMOB DF GeoServer by HTTP/web.test.fail[SEMOB GeoServer])<>0
+      name: 'SEMOB: GeoServer falhou no cenário web'
+      opdata: 'Etapa com falha: {ITEM.LASTVALUE1}'
+      priority: AVERAGE
+      description: Uma etapa do cenário web retornou código diferente de 200, timeout ou conteúdo sem a string esperada. A mensagem fica no item web.test.error.
+      tags:
+        - tag: scope
+          value: availability
+    - uuid: ef6198ff9fb94a19a91b5e6f4e9b8937
+      expression: avg(/SEMOB DF GeoServer by HTTP/web.test.time[SEMOB GeoServer,WFS GetFeature,resp],15m)>{$SEMOB.RESP.MAX}
+      name: 'SEMOB: GeoServer lento'
+      opdata: 'Tempo: {ITEM.LASTVALUE1}'
+      priority: WARNING
+      description: Tempo médio de resposta da etapa WFS GetFeature acima de {$SEMOB.RESP.MAX} s em 15 minutos.
+      dependencies:
+        - name: 'SEMOB: GeoServer falhou no cenário web'
+          expression: last(/SEMOB DF GeoServer by HTTP/web.test.fail[SEMOB GeoServer])<>0
+      tags:
+        - tag: scope
+          value: performance
+  graphs:
+    - uuid: c89d12a2b1fc46b39376abe51fc5bbd0
+      name: 'SEMOB: veículos por estado'
+      graph_items:
+        - color: 199C0D
+          item:
+            host: SEMOB DF GeoServer by HTTP
+            key: semob.positions.fresh
+        - sortorder: '1'
+          color: 2774A4
+          item:
+            host: SEMOB DF GeoServer by HTTP
+            key: semob.positions.moving
+        - sortorder: '2'
+          color: F63100
+          item:
+            host: SEMOB DF GeoServer by HTTP
+            key: semob.positions.stale
+        - sortorder: '3'
+          color: A54F10
+          item:
+            host: SEMOB DF GeoServer by HTTP
+            key: semob.positions.no_line
+    - uuid: 984a33106d244239bec917f0bd547ede
+      name: 'SEMOB: idade do registro mais recente'
+      graph_items:
+        - color: 199C0D
+          item:
+            host: SEMOB DF GeoServer by HTTP
+            key: semob.positions.newest_age
+    - uuid: 991473ccf01b4434b5baec9a5d66e52d
+      name: 'SEMOB: velocidade média reportada'
+      graph_items:
+        - color: 199C0D
+          item:
+            host: SEMOB DF GeoServer by HTTP
+            key: semob.positions.speed_avg
+    - uuid: a5d179ce2d204be9bde556ec25779723
+      name: 'SEMOB: qualidade do feed de posições'
+      graph_items:
+        - color: 199C0D
+          item:
+            host: SEMOB DF GeoServer by HTTP
+            key: semob.positions.no_line
+        - sortorder: '1'
+          color: 2774A4
+          item:
+            host: SEMOB DF GeoServer by HTTP
+            key: semob.positions.invalid_coords
+        - sortorder: '2'
+          color: F63100
+          item:
+            host: SEMOB DF GeoServer by HTTP
+            key: semob.positions.invalid_timestamps
+        - sortorder: '3'
+          color: A54F10
+          item:
+            host: SEMOB DF GeoServer by HTTP
+            key: semob.positions.duplicates
+        - sortorder: '4'
+          color: 6C59DC
+          item:
+            host: SEMOB DF GeoServer by HTTP
+            key: semob.positions.speed_errors
+    - uuid: 7fccf7cd47314992a2a0b7adcb6d74c8
+      name: 'SEMOB: tempo de resposta do GeoServer'
+      graph_items:
+        - color: 199C0D
+          item:
+            host: SEMOB DF GeoServer by HTTP
+            key: web.test.time[SEMOB GeoServer,WFS GetCapabilities,resp]
+        - sortorder: '1'
+          color: 2774A4
+          item:
+            host: SEMOB DF GeoServer by HTTP
+            key: web.test.time[SEMOB GeoServer,WFS GetFeature,resp]
+        - sortorder: '2'
+          color: F63100
+          item:
+            host: SEMOB DF GeoServer by HTTP
+            key: web.test.time[SEMOB GeoServer,WMS GetCapabilities,resp]
+    - uuid: 4b78c7d87f2c4a05a0a916ccaf1a3f83
+      name: 'SEMOB: frota cadastrada'
+      graph_items:
+        - color: 199C0D
+          item:
+            host: SEMOB DF GeoServer by HTTP
+            key: semob.fleet.total
